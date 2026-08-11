@@ -1,0 +1,61 @@
+name: Keep Supabase Project Alive
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch: 
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          echo "Pinging Supabase database to prevent auto-pause..."
+          
+          RAW_URL="${{ secrets.SUPABASE_URL }}"
+          RAW_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          
+          # Clean spaces and quotes
+          URL=$(echo "$RAW_URL" | xargs | tr -d '"' | tr -d "'")
+          KEY=$(echo "$RAW_KEY" | xargs | tr -d '"' | tr -d "'")
+          
+          # Remove trailing slash if present
+          URL="${URL%/}"
+          
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "❌ Error: SUPABASE_URL or SUPABASE_ANON_KEY secret is empty or missing in GitHub Repository Secrets."
+            echo "Please check Settings > Secrets and variables > Actions > Repository secrets."
+            exit 1
+          fi
+
+          # Query questions table (runs an actual SELECT query on the Postgres database)
+          TARGET_ENDPOINT="${URL}/rest/v1/questions?select=id&limit=1"
+          echo "Targeting Endpoint: $TARGET_ENDPOINT"
+
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            "$TARGET_ENDPOINT")
+            
+          echo "Supabase HTTP Status Code: $HTTP_STATUS"
+          
+          # If 404 (questions table not created yet), fallback to root OpenAPI schema request
+          if [ "$HTTP_STATUS" -eq 404 ]; then
+            echo "Table 'questions' not found, falling back to root REST API ping..."
+            TARGET_ENDPOINT="${URL}/rest/v1/"
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "apikey: $KEY" \
+              -H "Authorization: Bearer $KEY" \
+              -H "Accept: application/json" \
+              "$TARGET_ENDPOINT")
+            echo "Fallback HTTP Status Code: $HTTP_STATUS"
+          fi
+          
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "✅ Successfully pinged Supabase! Database keep-alive active."
+          else
+            echo "❌ Failed to ping Supabase. HTTP status: $HTTP_STATUS"
+            echo "Note: If status is 401, check if SUPABASE_ANON_KEY in GitHub Secrets is correct."
+            exit 1
+          fi
