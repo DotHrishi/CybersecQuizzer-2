@@ -70,14 +70,18 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* Right Side: User + Theme Toggle */}
+        {/* Right Side: User Profile Badge + Theme Toggle */}
         <div className="flex items-center space-x-3">
-          {userName && (
-            <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-cyber-800/80 border border-slate-700 text-xs font-semibold text-white shadow-sm">
-              <User className="w-3.5 h-3.5 text-slate-300" />
-              <span className="max-w-[100px] truncate">{userName}</span>
-            </div>
-          )}
+          <Link
+            href="/profile"
+            title="Click to view and edit your profile"
+            className="flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-slate-900/10 dark:bg-cyber-800/80 border border-slate-300 dark:border-slate-700 hover:border-slate-900 dark:hover:border-white text-xs font-bold text-slate-900 dark:text-white shadow-sm hover:scale-105 transition-all cursor-pointer group"
+          >
+            <User className="w-4 h-4 text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white" />
+            <span className="max-w-[120px] truncate">{userName || 'Profile'}</span>
+          </Link>
+
+
 
           {/* Theme Toggle Button */}
           <button

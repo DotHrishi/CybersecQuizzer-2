@@ -33,6 +33,7 @@ model UserAttempt {
   bonusPoints    Int      // Speed bonus: 10, 8, 6, 4, 2, 1, 0
   totalPoints    Int      // score + bonusPoints
   responseTimeMs Int      // Milliseconds taken to respond
+  category       String?  @default("General Security")
   createdAt      DateTime @default(now())
 
   @@index([userName])
@@ -40,3 +41,20 @@ model UserAttempt {
   @@index([userName, quizDate])
   @@map("user_attempts")
 }
+
+
+model UserProfile {
+  id             Int      @id @default(autoincrement())
+  fullName       String
+  nickname       String   @unique
+  isNicknameSame Boolean  @default(false)
+  email          String
+  emailType      String   @default("college") // "college" or "personal"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([nickname])
+  @@index([email])
+  @@map("user_profiles")
+}
+

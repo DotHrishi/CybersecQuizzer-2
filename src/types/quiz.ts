@@ -54,6 +54,19 @@ export interface LeaderboardEntry {
   lastAttemptDate: string;
 }
 
+export interface CategoryStat {
+  category: string;
+  totalBankQuestions: number;
+  attemptsCount: number;
+  correctCount: number;
+  wrongCount: number;
+  accuracyPercentage: number;
+  completionProgress: number;
+  avgResponseTimeMs: number;
+  totalPoints: number;
+  masteryLevel: 'Mastered' | 'Proficient' | 'Developing' | 'Not Started';
+}
+
 export interface UserReportStats {
   userName: string;
   totalAttempts: number;
@@ -63,6 +76,10 @@ export interface UserReportStats {
   avgResponseTimeMs: number;
   totalPoints: number;
   bestRank: number | string;
+  totalBankQuestionsAll: number;
+  overallCompletionProgress: number;
+  topicStats: CategoryStat[];
+
   history: {
     quizDate: string;
     isCorrect: boolean;
@@ -71,5 +88,7 @@ export interface UserReportStats {
     totalPoints: number;
     responseTimeMs: number;
     createdAt: string;
+    category?: string;
   }[];
 }
+

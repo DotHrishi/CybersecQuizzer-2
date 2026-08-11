@@ -63,7 +63,7 @@ export async function getDynamicGuardMessage(state: QuizStatusState, defaultMsg:
   if (state === 'BEFORE_WINDOW') {
     promptContext = "The daily cybersecurity quiz is currently closed because it opens at 10:00 AM IST (Monday-Friday). Write a punchy, creative 1-sentence message (under 25 words) telling the user to return at 10:00 AM IST. Vary tone with cybersecurity themes like firewalls, encrypted vaults, zero-day readiness, or defense skills.";
   } else if (state === 'AFTER_WINDOW') {
-    promptContext = "Today's daily cybersecurity quiz window (10:00 AM - 6:00 PM IST) has closed for the day. Write a clever, punchy 1-sentence message (under 25 words) encouraging them and telling them to return tomorrow at 10:00 AM IST for the next challenge.";
+    promptContext = "Today's daily cybersecurity quiz window (10:00 AM - 9:00 PM IST) has closed for the day. Write a clever, punchy 1-sentence message (under 25 words) encouraging them and telling them to return tomorrow at 10:00 AM IST for the next challenge.";
   } else if (state === 'WEEKEND') {
     promptContext = "The daily cybersecurity quiz is unavailable because it is the weekend (Saturday/Sunday). Write a fun, witty 1-sentence weekend blackout message (under 25 words) reminding users to rest up their cyber defenses and return on Monday at 10:00 AM IST.";
   } else if (state === 'ALREADY_ATTEMPTED') {

@@ -42,3 +42,28 @@ export const QuestionSchema = z.object({
 export const AdminAuthSchema = z.object({
   adminPassword: z.string().min(1, 'Admin password is required.'),
 });
+
+// User Profile validation
+export const ProfileSchema = z.object({
+  fullName: z
+    .string({ required_error: 'Full name is required.' })
+    .trim()
+    .min(2, 'Full name must be at least 2 characters long.')
+    .max(100, 'Full name must be at most 100 characters long.'),
+  nickname: z
+    .string({ required_error: 'Nickname is required.' })
+    .trim()
+    .min(2, 'Nickname must be at least 2 characters long.')
+    .max(30, 'Nickname must be at most 30 characters long.')
+    .regex(/^[a-zA-Z0-9_\-\s]+$/, 'Nickname can only contain letters, numbers, spaces, underscores, or hyphens.'),
+  isNicknameSame: z.boolean().default(false),
+  email: z
+    .string({ required_error: 'Email address is required.' })
+    .trim()
+    .toLowerCase()
+    .email('Please enter a valid email address.'),
+  emailType: z.enum(['college', 'personal'], {
+    errorMap: () => ({ message: 'Email type must be college or personal.' }),
+  }).default('college'),
+});
+

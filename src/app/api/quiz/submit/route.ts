@@ -119,7 +119,9 @@ export async function POST(req: NextRequest) {
       bonusPoints: scoreResult.bonusPoints,
       totalPoints: scoreResult.totalPoints,
       responseTimeMs: Math.round(scoreResult.responseTimeMs),
+      category: (question as any).category || 'General Security',
     });
+
 
     // Invalidate active session to prevent double submission
     activeSessions.delete(sessionId);

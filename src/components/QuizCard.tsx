@@ -58,7 +58,14 @@ export default function QuizCard({ questionData, userName, onSubmitted }: QuizCa
         }),
       });
 
-      const data = await response.json();
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        toast.error('Server error processing submission. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
 
       if (response.status === 429) {
         toast.error(data.message || 'Too many requests sent! Please wait a moment before trying again.');
@@ -66,13 +73,14 @@ export default function QuizCard({ questionData, userName, onSubmitted }: QuizCa
         return;
       }
 
-      if (!data.success) {
+      if (!response.ok || !data.success) {
         toast.error(data.message || 'Failed to submit answer.');
         setIsSubmitting(false);
         return;
       }
 
       onSubmitted(data);
+
     } catch (error: any) {
       toast.error(error.message || 'An error occurred during submission.');
       setIsSubmitting(false);
@@ -149,8 +157,9 @@ export default function QuizCard({ questionData, userName, onSubmitted }: QuizCa
           type="button"
           disabled={!selectedOption || isSubmitting}
           onClick={handleSubmit}
-          className="w-full py-4 px-6 rounded-2xl bg-white text-black hover:bg-slate-200 flex items-center justify-center space-x-2 text-base font-bold shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          className="w-full py-4 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-black dark:hover:bg-slate-200 flex items-center justify-center space-x-2 text-base font-bold shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
         >
+
           {isSubmitting ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />

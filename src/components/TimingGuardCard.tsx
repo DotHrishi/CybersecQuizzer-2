@@ -35,7 +35,7 @@ export default function TimingGuardCard({ state, message, userName, attempt }: T
             <p className="text-base font-semibold leading-relaxed">{message}</p>
           </div>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            The Cybersecurity Quiz is live Monday to Friday between <strong>10:00 AM</strong> and <strong>6:00 PM IST</strong> (Indian Standard Time). Complete before <strong>11:00 AM</strong> for Early Bird Bonus points!
+            The Cybersecurity Quiz is live Monday to Friday between <strong>10:00 AM</strong> and <strong>9:00 PM IST</strong> (Indian Standard Time). Complete before <strong>11:00 AM</strong> for Early Bird Bonus points!
           </p>
         </div>
       )}
@@ -54,10 +54,11 @@ export default function TimingGuardCard({ state, message, userName, attempt }: T
             <p className="text-base font-semibold leading-relaxed">{message}</p>
           </div>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Today&apos;s quiz window (10:00 AM – 6:00 PM IST) has ended. Return tomorrow at 10:00 AM IST for the next challenge!
+            Today&apos;s quiz window (10:00 AM – 9:00 PM IST) has ended. Return tomorrow at 10:00 AM IST for the next challenge!
           </p>
         </div>
       )}
+
 
       {state === 'WEEKEND' && (
         <div className="space-y-4">

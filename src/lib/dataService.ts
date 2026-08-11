@@ -104,13 +104,33 @@ export const dataService = {
     bonusPoints: number;
     totalPoints: number;
     responseTimeMs: number;
+    category?: string;
   }) {
+    const payload = {
+      ...data,
+      category: data.category || 'General Security',
+    };
+
     if (isSupabaseConfigured) {
       const { data: record, error } = await supabase
         .from('user_attempts')
-        .insert(data)
+        .insert(payload)
         .select()
         .single();
+
+      // Graceful Fallback: If remote Supabase user_attempts table does not have 'category' column added yet
+      if (error && (error.message?.includes('category') || error.message?.includes('schema cache'))) {
+        const { category, ...legacyPayload } = payload;
+        const retry = await supabase
+          .from('user_attempts')
+          .insert(legacyPayload)
+          .select()
+          .single();
+
+        if (!retry.error && retry.data) {
+          return retry.data;
+        }
+      }
 
       if (error) {
         console.error('Supabase create attempt error:', error);
@@ -120,10 +140,49 @@ export const dataService = {
     }
 
     try {
-      return await db.userAttempt.create({ data });
+      return await db.userAttempt.create({ data: payload });
     } catch (dbErr) {
       console.error('Prisma createUserAttempt fallback failed:', dbErr);
       throw dbErr;
+    }
+  },
+
+
+  async getQuestionsCategoryCounts() {
+    const countsMap: Record<string, number> = {};
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('questions')
+          .select('category')
+          .eq('active', true);
+
+        if (!error && data) {
+          data.forEach((q: any) => {
+            const cat = q.category || 'General Security';
+            countsMap[cat] = (countsMap[cat] || 0) + 1;
+          });
+          return countsMap;
+        }
+      } catch (err) {
+        console.warn('Supabase getQuestionsCategoryCounts failed:', err);
+      }
+    }
+
+    try {
+      const questions = await db.question.findMany({
+        where: { active: true },
+        select: { category: true },
+      });
+      questions.forEach((q: any) => {
+        const cat = q.category || 'General Security';
+        countsMap[cat] = (countsMap[cat] || 0) + 1;
+      });
+      return countsMap;
+    } catch (dbErr) {
+      console.error('Prisma getQuestionsCategoryCounts fallback failed:', dbErr);
+      return countsMap;
     }
   },
 
@@ -282,5 +341,85 @@ export const dataService = {
       console.error('Prisma resetLeaderboard fallback failed:', dbErr);
       return false;
     }
+  },
+
+  async getUserProfile(nickname: string) {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('nickname', nickname)
+          .maybeSingle();
+
+        if (!error) return data;
+        console.error('Supabase getUserProfile error:', error);
+      } catch (err) {
+        console.warn('Supabase getUserProfile failed:', err);
+      }
+    }
+
+    try {
+      return await db.userProfile.findUnique({
+        where: { nickname },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getUserProfile fallback failed:', dbErr);
+      return null;
+    }
+  },
+
+  async upsertUserProfile(profileData: {
+    fullName: string;
+    nickname: string;
+    isNicknameSame: boolean;
+    email: string;
+    emailType: 'college' | 'personal';
+  }) {
+    const payload = {
+      fullName: profileData.fullName,
+      nickname: profileData.nickname,
+      isNicknameSame: profileData.isNicknameSame,
+      email: profileData.email,
+      emailType: profileData.emailType,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .upsert(payload, { onConflict: 'nickname' })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase upsertUserProfile error:', error);
+        throw new Error(error.message);
+      }
+      return data;
+    }
+
+    try {
+      return await db.userProfile.upsert({
+        where: { nickname: profileData.nickname },
+        update: {
+          fullName: profileData.fullName,
+          isNicknameSame: profileData.isNicknameSame,
+          email: profileData.email,
+          emailType: profileData.emailType,
+        },
+        create: {
+          fullName: profileData.fullName,
+          nickname: profileData.nickname,
+          isNicknameSame: profileData.isNicknameSame,
+          email: profileData.email,
+          emailType: profileData.emailType,
+        },
+      });
+    } catch (dbErr) {
+      console.error('Prisma upsertUserProfile fallback failed:', dbErr);
+      throw dbErr;
+    }
   }
 };
+
