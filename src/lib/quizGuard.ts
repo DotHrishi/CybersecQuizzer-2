@@ -77,53 +77,16 @@ export function getQuizGuardStatus(overrideDate?: Date): QuizGuardResult {
     currentTimeString = `${currentHour}:${String(currentMinute).padStart(2, '0')}`;
   }
 
-  // 1. Weekend check
-  if (isWeekend) {
-    return {
-      isOpen: false,
-      state: 'WEEKEND',
-      message: 'Quiz is not conducted on weekends.',
-      quizDate,
-      currentTimeString,
-    };
-  }
-
-
-
-  // 2. Timing Window: 10:00 AM (600 mins) to 9:00 PM (1260 mins) ONLY IST
-  const OPEN_MINUTES = 10 * 60;  // 10:00 AM
-  const CLOSE_MINUTES = 21 * 60; // 9:00 PM
-
-  if (currentTotalMinutes < OPEN_MINUTES) {
-    return {
-      isOpen: false,
-      state: 'BEFORE_WINDOW',
-      message: "Today's quiz will be available from 10:00 AM IST.",
-      quizDate,
-      currentTimeString,
-    };
-  }
-
-  if (currentTotalMinutes >= CLOSE_MINUTES) {
-    return {
-      isOpen: false,
-      state: 'AFTER_WINDOW',
-      message: "Today's quiz has ended.",
-      quizDate,
-      currentTimeString,
-    };
-  }
-
-  // 3. Open Window (Strictly 10:00 AM to 9:00 PM, Mon-Fri)
-
+  // Quiz is ACTIVE ALL TIME for now
   return {
     isOpen: true,
     state: 'OPEN',
-    message: "Today's quiz is now LIVE! Good luck!",
+    message: "Today's quiz is LIVE! Good luck!",
     quizDate,
     currentTimeString,
   };
 }
+
 
 export async function getDynamicQuizGuardStatus(overrideDate?: Date): Promise<QuizGuardResult> {
   const guard = getQuizGuardStatus(overrideDate);
