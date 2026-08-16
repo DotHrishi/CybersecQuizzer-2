@@ -48,7 +48,7 @@ export default function Navbar() {
       <div className="container mx-auto px-4 max-w-7xl">
 
         {/* ── Main bar ── */}
-        <div className="relative flex items-center justify-between h-20 sm:h-24">
+        <div className="relative flex items-center justify-between h-24 sm:h-28">
 
           {/* Left Wing: Theme toggle on far left + Left 2 Options centered between Theme button and Logo */}
           <div className="flex-1 flex items-center justify-between min-w-0">
@@ -68,7 +68,6 @@ export default function Navbar() {
                 )}
               </button>
             </div>
-
 
             {/* Left 2 Options: Centered in the remaining space */}
             <div className="flex-1 flex items-center justify-center px-2">
@@ -94,19 +93,20 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Center: Logo (enlarged) */}
-          <div className="flex-shrink-0 flex items-center justify-center px-4">
+          {/* Center: Logo (enlarged prominent size) */}
+          <div className="flex-shrink-0 flex items-center justify-center px-3 sm:px-5">
             <Link href="/" title="Cyber Safety & Awareness Programme" className="block">
               <Image
                 src="/cyber-safety-logo.png"
                 alt="Cyber Safety & Awareness Programme"
-                width={440}
-                height={140}
+                width={520}
+                height={160}
                 priority
-                className="h-14 sm:h-18 md:h-20 lg:h-22 w-auto object-contain bg-white rounded-lg px-2.5 py-1"
+                className="h-16 sm:h-20 md:h-24 lg:h-26 w-auto object-contain bg-white rounded-xl px-3 py-1.5 transition-transform hover:scale-[1.02] shadow-2xs"
               />
             </Link>
           </div>
+
 
           {/* Right Wing: Right 2 Options centered between Logo and Profile Badge + Profile Badge on far right */}
           <div className="flex-1 flex items-center justify-between min-w-0">
