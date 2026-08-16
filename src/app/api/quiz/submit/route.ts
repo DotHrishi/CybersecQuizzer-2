@@ -64,16 +64,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if attempt already exists in DB for this date (prevent multiple submissions)
+    // Check if attempt already exists in DB for this date — Strictly ONE QUESTION PER DAY
     const existingAttempt = await dataService.getUserAttemptToday(session.userName, session.quizDate);
 
     if (existingAttempt) {
       activeSessions.delete(sessionId);
       return NextResponse.json(
-        { success: false, message: "You have already attempted today's quiz." },
+        { success: false, message: "You have already attempted today's quiz. Only one question per day is allowed." },
         { status: 409 }
       );
     }
+
+
 
     // Server-side anti-cheat verification
     const antiCheat = verifySubmissionAntiCheat(session.startTime);

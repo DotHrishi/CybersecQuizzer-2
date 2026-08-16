@@ -106,17 +106,14 @@ export async function GET(req: NextRequest) {
 
     const overallCompletionProgress = calculateProgressPct(totalAttempts, totalBankQuestionsAll);
 
-    // Group user attempts by category
+    // Group user attempts by category — preserve the actual stored category
     const categoryAttemptsMap: Record<string, any[]> = {};
     QUIZ_TOPICS.forEach((cat) => {
       categoryAttemptsMap[cat] = [];
     });
 
     attempts.forEach((att: any) => {
-      let cat = att.category;
-      if (!cat || !QUIZ_TOPICS.includes(cat)) {
-        cat = 'General Security';
-      }
+      const cat = (att.category && att.category.trim()) ? att.category.trim() : 'General Security';
       if (!categoryAttemptsMap[cat]) {
         categoryAttemptsMap[cat] = [];
       }
@@ -205,14 +202,14 @@ export async function GET(req: NextRequest) {
         overallCompletionProgress,
         topicStats,
 
-        history: attempts.map((a: any, idx: number) => ({
+        history: attempts.map((a: any) => ({
           quizDate: a.quizDate,
           isCorrect: a.isCorrect,
           score: a.score,
           bonusPoints: a.bonusPoints,
           totalPoints: a.totalPoints,
           responseTimeMs: a.responseTimeMs,
-          category: a.category || QUIZ_TOPICS[idx % QUIZ_TOPICS.length],
+          category: a.category || 'General Security',
           createdAt: new Date(a.createdAt).toISOString(),
         })),
       },

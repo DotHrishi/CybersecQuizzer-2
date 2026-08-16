@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Cybersecurity Awareness & Digital Safety Programme',
-  description: 'Test your cybersecurity knowledge daily. Earn points, trigger celebration reactions, and climb the leaderboard!',
+  description: 'Test your cybersecurity knowledge daily. Earn points, track topic accuracy, and climb the school leaderboard!',
 };
 
 export default function RootLayout({
@@ -19,18 +19,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} min-h-screen flex flex-col justify-between`}>
+    <html lang="en" className="light">
+      <body className={`${inter.className} min-h-screen flex flex-col justify-between bg-[#f8fafc] text-slate-900`}>
         <ThemeProvider>
           <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,
               style: {
-                background: '#111111',
-                color: '#F8FAFC',
-                border: '1px solid rgba(0, 255, 102, 0.3)',
-                boxShadow: '0 0 15px rgba(0, 255, 102, 0.15)',
+                background: '#0f172a',
+                color: '#f8fafc',
+                borderRadius: '0.5rem',
+                border: '1px solid #334155',
+                fontSize: '12px',
+                fontWeight: '600',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
               },
             }}
           />
@@ -42,3 +45,4 @@ export default function RootLayout({
     </html>
   );
 }
+

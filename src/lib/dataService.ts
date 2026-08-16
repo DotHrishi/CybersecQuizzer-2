@@ -9,12 +9,13 @@ const isSupabaseConfigured = Boolean(
 
 export const dataService = {
   async getUserAttemptToday(userName: string, quizDate: string) {
+    const cleanName = userName.trim();
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase
           .from('user_attempts')
           .select('*')
-          .eq('userName', userName)
+          .ilike('userName', cleanName)
           .eq('quizDate', quizDate)
           .maybeSingle();
 
@@ -26,14 +27,18 @@ export const dataService = {
     }
     
     try {
-      return await db.userAttempt.findFirst({
-        where: { userName, quizDate },
-      });
+      const records: any[] = await db.$queryRaw`
+        SELECT * FROM user_attempts
+        WHERE LOWER(userName) = LOWER(${cleanName}) AND quizDate = ${quizDate}
+        LIMIT 1
+      `;
+      return records.length > 0 ? records[0] : null;
     } catch (dbErr) {
       console.error('Prisma fallback failed:', dbErr);
       return null;
     }
   },
+
 
   async getRandomActiveQuestion() {
     if (isSupabaseConfigured) {
@@ -73,7 +78,7 @@ export const dataService = {
       try {
         const { data, error } = await supabase
           .from('questions')
-          .select('id, correctOption, optionA, optionB, optionC, optionD')
+          .select('id, correctOption, optionA, optionB, optionC, optionD, category')
           .eq('id', id)
           .single();
 
@@ -87,7 +92,7 @@ export const dataService = {
     try {
       return await db.question.findUnique({
         where: { id },
-        select: { id: true, correctOption: true, optionA: true, optionB: true, optionC: true, optionD: true },
+        select: { id: true, correctOption: true, optionA: true, optionB: true, optionC: true, optionD: true, category: true },
       });
     } catch (dbErr) {
       console.error('Prisma getQuestionById fallback failed:', dbErr);
@@ -211,7 +216,7 @@ export const dataService = {
         const { data, error } = await supabase
           .from('user_attempts')
           .select('*')
-          .eq('userName', userName)
+          .ilike('userName', userName)   // case-insensitive match
           .order('createdAt', { ascending: false });
 
         if (!error && data) return data;
@@ -222,10 +227,13 @@ export const dataService = {
     }
 
     try {
-      return await db.userAttempt.findMany({
-        where: { userName },
-        orderBy: { createdAt: 'desc' },
-      });
+      // SQLite doesn't support mode:'insensitive' — use raw LOWER() comparison
+      const results: any[] = await db.$queryRaw`
+        SELECT * FROM user_attempts
+        WHERE LOWER(userName) = LOWER(${userName})
+        ORDER BY createdAt DESC
+      `;
+      return results;
     } catch (dbErr) {
       console.error('Prisma getUserAttempts fallback failed:', dbErr);
       return [];

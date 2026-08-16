@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   }
 
 
-  // Double-check if user already attempted today
+  // Double-check if user already attempted today — Strictly ONE QUESTION PER DAY
   const existingAttempt = await dataService.getUserAttemptToday(userName.trim(), guard.quizDate);
 
   if (existingAttempt) {
@@ -44,6 +44,8 @@ export async function GET(req: NextRequest) {
       { status: 403 }
     );
   }
+
+
 
   try {
     const targetQuestion = await dataService.getRandomActiveQuestion();

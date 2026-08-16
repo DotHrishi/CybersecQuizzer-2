@@ -16,3 +16,17 @@ export interface UserProfileFormValues {
   email: string;
   emailType: 'college' | 'personal';
 }
+
+export interface UserBadgeInfo {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  image: string;
+  requiredQuestions: number;
+  currentCount: number;
+  isUnlocked: boolean;
+  category?: string;
+  badgeType?: 'milestone' | 'topic';
+}
+

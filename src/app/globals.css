@@ -3,151 +3,543 @@
 @tailwind utilities;
 
 /* ============================================================
-   BASE — Dark (default)
+   BASE THEME — SaaS Design System
+   Inter font, #0f172a primary, blue accent, slate neutrals
    ============================================================ */
 @layer base {
+  :root {
+    --radius: 0.5rem;
+    --color-primary: #0f172a;
+    --color-primary-hover: #1e293b;
+    --color-border: #e2e8f0;
+    --color-border-strong: #cbd5e1;
+    --color-surface: #ffffff;
+    --color-surface-raised: #f8fafc;
+    --color-surface-sunken: #f1f5f9;
+    --color-text: #0f172a;
+    --color-text-secondary: #475569;
+    --color-text-muted: #94a3b8;
+    --color-accent: #2563eb;
+    --color-accent-hover: #1d4ed8;
+    --color-accent-subtle: #eff6ff;
+    --color-danger: #dc2626;
+    --color-danger-subtle: #fef2f2;
+    --color-success: #16a34a;
+    --color-success-subtle: #f0fdf4;
+    --color-warning: #d97706;
+    --color-warning-subtle: #fffbeb;
+  }
+
+  html.dark {
+    --color-border: #1e293b;
+    --color-border-strong: #334155;
+    --color-surface: #0f172a;
+    --color-surface-raised: #1e293b;
+    --color-surface-sunken: #020617;
+    --color-text: #f8fafc;
+    --color-text-secondary: #94a3b8;
+    --color-text-muted: #475569;
+    --color-accent-subtle: #1e3a5f;
+  }
+
   body {
     @apply font-sans antialiased min-h-screen;
-    background-color: #000000;
-    color: #f1f5f9;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    background-color: #f8fafc;
+    color: var(--color-text);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  html.dark body {
+    background-color: #020617;
+    color: var(--color-text);
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  /* Smooth focus rings */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius);
   }
 }
 
 /* ============================================================
-   LIGHT MODE OVERRIDES (crisp executive white/black)
+   SCROLLBAR
    ============================================================ */
-html.light body {
-  background-color: #f8fafc;
-  color: #0f172a;
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
-
-html.light .glass-panel {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-html.light .glass-panel-glow {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(0, 0, 0, 0.15) !important;
-  box-shadow: 0 0 30px -8px rgba(0, 0, 0, 0.1) !important;
-}
-
-/* Text overrides for light mode */
-html.light .text-slate-100  { color: #0f172a !important; }
-html.light .text-slate-200  { color: #1e293b !important; }
-html.light .text-slate-300  { color: #334155 !important; }
-html.light .text-slate-400  { color: #475569 !important; }
-html.light .text-slate-500  { color: #64748b !important; }
-
-
-/* Text & border contrast in light mode */
-html.light .text-cyber-accent { color: #0f172a !important; }
-html.light .bg-cyber-accent\/15 { background-color: rgba(15, 23, 42, 0.1) !important; }
-html.light .border-cyber-accent\/30 { border-color: rgba(15, 23, 42, 0.2) !important; }
-html.light .border-cyber-accent\/40 { border-color: rgba(15, 23, 42, 0.3) !important; }
-
-/* Navbar Logo text in light mode */
-html.light .brand-logo-text {
-  color: #0f172a !important;
-}
-
-/* Border overrides */
-html.light .border-slate-800 { border-color: rgba(0,0,0,0.1) !important; }
-html.light .divide-slate-800\/60 > * + * { border-color: rgba(0,0,0,0.07) !important; }
-
-/* Background overrides */
-html.light .bg-cyber-900,
-html.light .bg-cyber-900\/40,
-html.light .bg-cyber-900\/60,
-html.light .bg-cyber-900\/80,
-html.light .bg-cyber-900\/90 { background-color: rgba(240,244,248,0.9) !important; }
-
-html.light .bg-cyber-950,
-html.light .bg-cyber-950\/60,
-html.light .bg-cyber-950\/80 { background-color: rgba(230,235,240,0.95) !important; }
-
-html.light .bg-cyber-800,
-html.light .bg-cyber-800\/80 { background-color: rgba(220,228,236,0.95) !important; }
-
-html.light .hover\:bg-cyber-700:hover,
-html.light .hover\:bg-cyber-900\/40:hover,
-html.light .hover\:bg-cyber-900\/60:hover { background-color: rgba(200,215,225,0.9) !important; }
-
-/* Nav tab hover in light */
-html.light .hover\:bg-slate-800\/50:hover { background-color: rgba(0,0,0,0.06) !important; }
-html.light .border-slate-700 { border-color: rgba(0,0,0,0.12) !important; }
-
-/* Footer */
-html.light footer { border-color: rgba(0,0,0,0.1) !important; background-color: rgba(240,244,248,0.9) !important; }
-html.light footer p { color: #64748b !important; }
+html.dark ::-webkit-scrollbar-thumb { background: #334155; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 /* ============================================================
-   SHARED UTILITIES (both themes)
+   CARD / SURFACE
+   ============================================================ */
+@layer components {
+  .card {
+    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm;
+  }
+
+  .card-raised {
+    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  }
+
+  .card-sunken {
+    @apply bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg;
+  }
+
+  /* ============================================================
+     BUTTONS
+     Primary / Secondary / Ghost / Destructive
+     ============================================================ */
+
+  /* Primary */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 font-semibold rounded-lg transition-all select-none cursor-pointer;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-xs   { @apply px-2.5 py-1.5 text-[11px]; }
+  .btn-sm   { @apply px-3 py-2 text-xs; }
+  .btn-md   { @apply px-4 py-2.5 text-sm; }
+  .btn-lg   { @apply px-5 py-3 text-sm; }
+
+  .btn-primary {
+    @apply btn bg-[#0f172a] text-white hover:bg-slate-800 active:bg-slate-900;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  html.dark .btn-primary {
+    background: #f8fafc;
+    color: #0f172a;
+  }
+  html.dark .btn-primary:hover { background: #e2e8f0; }
+
+  .btn-secondary {
+    @apply btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200;
+    @apply border border-slate-200 dark:border-slate-700;
+    @apply hover:bg-slate-50 dark:hover:bg-slate-700;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-slate-600 dark:text-slate-400;
+    @apply hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white;
+  }
+
+  .btn-destructive {
+    @apply btn bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+
+  .btn-icon {
+    @apply btn-ghost p-1.5 rounded-lg;
+  }
+
+  /* ============================================================
+     FORM FIELDS
+     ============================================================ */
+  .field-input {
+    @apply w-full px-3 py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all;
+    @apply bg-slate-50 dark:bg-slate-800;
+    @apply border border-slate-200 dark:border-slate-700;
+    @apply text-slate-900 dark:text-white placeholder-slate-400;
+    @apply focus:outline-none focus:bg-white dark:focus:bg-slate-800;
+    @apply focus:border-slate-900 dark:focus:border-white;
+    @apply focus:ring-0;
+  }
+
+  .field-input-error {
+    @apply border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20;
+    @apply focus:border-rose-500 dark:focus:border-rose-400;
+  }
+
+  .field-label {
+    @apply block text-xs font-bold tracking-wide text-slate-700 dark:text-slate-300 mb-1.5;
+  }
+
+  .field-helper {
+    @apply text-[11px] text-slate-400 dark:text-slate-500 mt-1;
+  }
+
+  .field-error {
+    @apply text-[11px] text-rose-600 dark:text-rose-400 mt-1 font-medium;
+  }
+
+  /* ============================================================
+     BADGES / STATUS PILLS
+     ============================================================ */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border;
+  }
+
+  .badge-slate   { @apply badge bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700; }
+  .badge-blue    { @apply badge bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800; }
+  .badge-green   { @apply badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800; }
+  .badge-amber   { @apply badge bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800; }
+  .badge-red     { @apply badge bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800; }
+  .badge-purple  { @apply badge bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800; }
+
+  /* ============================================================
+     TABLE
+     ============================================================ */
+  .table-wrapper {
+    @apply w-full overflow-x-auto;
+  }
+
+  .table-base {
+    @apply w-full text-left text-xs border-collapse;
+  }
+
+  .table-head {
+    @apply sticky top-0 z-10 bg-slate-50/90 dark:bg-slate-800/90 backdrop-blur-sm;
+    @apply border-b border-slate-200 dark:border-slate-700;
+  }
+
+  .table-th {
+    @apply py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 select-none whitespace-nowrap;
+  }
+
+  .table-th-sortable {
+    @apply table-th cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors;
+  }
+
+  .table-row {
+    @apply border-b border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors;
+  }
+
+  .table-td {
+    @apply py-3 px-4 text-slate-700 dark:text-slate-300;
+  }
+
+  /* ============================================================
+     FILTER BAR
+     ============================================================ */
+  .filter-bar {
+    @apply flex flex-wrap items-center gap-2 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl;
+  }
+
+  .filter-chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold;
+    @apply bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300;
+    @apply border border-slate-200 dark:border-slate-700;
+    @apply hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors;
+  }
+
+  .filter-chip-active {
+    @apply bg-[#0f172a] text-white border-[#0f172a] dark:bg-white dark:text-[#0f172a] dark:border-white;
+  }
+
+  /* ============================================================
+     SKELETON / LOADING
+     ============================================================ */
+  .skeleton {
+    @apply relative overflow-hidden bg-slate-200 dark:bg-slate-700 rounded-lg;
+  }
+
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.4) 50%,
+      transparent 100%
+    );
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    background-size: 200% 100%;
+  }
+
+  html.dark .skeleton::after {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.06) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  @keyframes skeleton-shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+
+  /* ============================================================
+     EMPTY STATE
+     ============================================================ */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 px-6 text-center space-y-3;
+  }
+
+  .empty-state-icon {
+    @apply w-12 h-12 rounded-2xl flex items-center justify-center;
+    @apply bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700;
+    @apply text-slate-400;
+  }
+
+  /* ============================================================
+     MODAL OVERLAY
+     ============================================================ */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgb(0 0 0 / 0.5);
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-panel {
+    @apply card-raised w-full max-h-[90vh] overflow-y-auto;
+  }
+
+  /* ============================================================
+     SIDE SHEET
+     ============================================================ */
+  .sheet-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: rgb(0 0 0 / 0.4);
+    backdrop-filter: blur(2px);
+  }
+
+  .sheet-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    width: min(480px, 100vw);
+    @apply bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800;
+    @apply overflow-y-auto;
+    box-shadow: -8px 0 32px rgb(0 0 0 / 0.12);
+  }
+
+  /* ============================================================
+     COMMAND PALETTE
+     ============================================================ */
+  .cmd-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 15vh;
+    background: rgb(0 0 0 / 0.45);
+    backdrop-filter: blur(4px);
+  }
+
+  .cmd-panel {
+    @apply bg-white dark:bg-slate-900;
+    @apply border border-slate-200 dark:border-slate-700;
+    @apply rounded-2xl overflow-hidden;
+    width: min(580px, calc(100vw - 2rem));
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.3);
+  }
+
+  /* ============================================================
+     TOOLTIP
+     ============================================================ */
+  .tooltip {
+    @apply absolute z-50 px-2 py-1 text-[11px] font-semibold rounded-md whitespace-nowrap pointer-events-none;
+    @apply bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+  }
+
+  /* ============================================================
+     PAGE LAYOUT
+     ============================================================ */
+  .page-header {
+    @apply mb-6;
+  }
+
+  .page-title {
+    @apply text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1;
+  }
+
+  .breadcrumb {
+    @apply flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-3;
+  }
+
+  .breadcrumb-sep { @apply text-slate-300 dark:text-slate-600; }
+  .breadcrumb-current { @apply font-semibold text-slate-700 dark:text-slate-200; }
+
+  /* ============================================================
+     ACTIVITY TIMELINE
+     ============================================================ */
+  .timeline-item {
+    @apply relative flex gap-3 pb-5 last:pb-0;
+  }
+
+  .timeline-line {
+    @apply absolute left-3.5 top-8 bottom-0 w-px bg-slate-200 dark:bg-slate-700;
+  }
+
+  .timeline-dot {
+    @apply relative z-10 w-7 h-7 rounded-full shrink-0 flex items-center justify-center;
+    @apply bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700;
+  }
+
+  /* ============================================================
+     TOGGLE SWITCH
+     ============================================================ */
+  .toggle {
+    @apply relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent;
+    @apply transition-colors duration-200 ease-in-out;
+  }
+
+  .toggle-thumb {
+    @apply pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow;
+    @apply transform transition duration-200 ease-in-out;
+  }
+
+  /* ============================================================
+     PROGRESS BAR
+     ============================================================ */
+  .progress-bar {
+    @apply w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full bg-[#0f172a] dark:bg-white rounded-full transition-all duration-500;
+  }
+
+  .progress-fill-blue { @apply h-full bg-blue-600 rounded-full transition-all duration-500; }
+  .progress-fill-green { @apply h-full bg-emerald-500 rounded-full transition-all duration-500; }
+  .progress-fill-amber { @apply h-full bg-amber-500 rounded-full transition-all duration-500; }
+  .progress-fill-red { @apply h-full bg-rose-500 rounded-full transition-all duration-500; }
+
+  /* ============================================================
+     KPI CARD
+     ============================================================ */
+  .kpi-card {
+    @apply card p-4 space-y-1;
+  }
+
+  .kpi-label {
+    @apply flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider;
+  }
+
+  .kpi-value {
+    @apply text-2xl font-extrabold text-slate-900 dark:text-white;
+  }
+
+  .kpi-sub {
+    @apply text-[11px] text-slate-400 dark:text-slate-500;
+  }
+
+  /* ============================================================
+     SECTION DIVIDER
+     ============================================================ */
+  .section-divider {
+    @apply border-t border-slate-100 dark:border-slate-800 my-4;
+  }
+
+  /* ============================================================
+     SEARCH INPUT (icon prefix)
+     ============================================================ */
+  .search-wrap { @apply relative; }
+  .search-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none;
+  }
+  .search-input {
+    @apply field-input pl-9;
+  }
+
+  /* ============================================================
+     BULK ACTION BAR
+     ============================================================ */
+  .bulk-bar {
+    @apply flex items-center gap-2 px-4 py-2.5 rounded-xl;
+    @apply bg-[#0f172a] dark:bg-slate-100 text-white dark:text-slate-900;
+    @apply border border-slate-800 dark:border-slate-200;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
+  }
+}
+
+/* ============================================================
+   LEGACY CLASS ALIASES  (keep backward compat)
    ============================================================ */
 .glass-panel {
-  background: rgba(12, 12, 14, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: background 0.3s ease, border-color 0.3s ease;
+  @apply card;
 }
 
 .glass-panel-glow {
-  background: rgba(10, 10, 12, 0.94);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 30px -8px rgba(255, 255, 255, 0.12);
-  transition: background 0.3s ease;
+  @apply card-raised;
 }
 
 .cyber-button {
-  background: #FFFFFF;
-  color: #000000;
-  font-weight: 700;
-  transition: all 0.2s ease-in-out;
+  @apply btn-primary btn-sm;
 }
 
-.cyber-button:hover:not(:disabled) {
-  background: #E2E8F0;
-  transform: translateY(-2px);
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+.btn-secondary-legacy {
+  @apply btn-secondary btn-sm;
 }
 
-.cyber-border-glow {
-  position: relative;
+/* Fields */
+input, select, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.cyber-border-glow::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  background: linear-gradient(90deg, #FFFFFF, #94A3B8, #FFFFFF);
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0.3;
-  transition: opacity 0.3s ease;
+/* ============================================================
+   PRINT / PDF STYLES
+   Triggered via window.print() from the report page.
+   Everything outside #print-report is hidden.
+   ============================================================ */
+@media print {
+  /* Hide entire page chrome */
+  body > *:not(#print-root) { display: none !important; }
+
+  /* Show only the print container */
+  #print-report {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    background: #ffffff;
+    color: #0f172a;
+    font-family: 'Inter', sans-serif;
+    font-size: 11pt;
+    padding: 0;
+    margin: 0;
+    z-index: 999999;
+  }
+
+  /* Force light colours for print */
+  #print-report * {
+    color: #0f172a !important;
+    background: transparent !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page breaks */
+  .print-page-break { page-break-after: always; break-after: page; }
+  .print-avoid-break { page-break-inside: avoid; break-inside: avoid; }
+
+  /* Progress bars — fill via background-color */
+  .print-bar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
-.cyber-border-glow:hover::after {
-  opacity: 0.7;
-}
-
-/* Animation Delays */
-.animation-delay-2000 {
-  animation-delay: 2s;
-}
-.animation-delay-3000 {
-  animation-delay: 3s;
-}
-.animation-delay-4000 {
-  animation-delay: 4s;
-}
-
-/* Smooth theme transition */
-*, *::before, *::after {
-  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.15s ease;
-}
+/* Hidden off-screen by default, shown only when #print-report exists and printing */
+#print-report { display: none; }

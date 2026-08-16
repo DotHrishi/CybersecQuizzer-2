@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Forms | School Management System</title>
+  
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              DEFAULT: '#0f172a',
+              hover: '#1e293b',
+              subtle: '#f1f5f9',
+            },
+            accent: {
+              DEFAULT: '#2563eb',
+              hover: '#1d4ed8',
+              subtle: '#eff6ff',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Custom Scrollbar for crisp Shadcn feel */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Subtle animation keyframes */
+    @keyframes slideInRight {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-sheet {
+      animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-modal {
+      animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-toast {
+      animation: toastIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Skeleton shimmer */
+    @keyframes shimmer {
+      100% { transform: translateX(100%); }
+    }
+    .skeleton-box {
+      position: relative;
+      overflow: hidden;
+      background-color: #e2e8f0;
+    }
+    .skeleton-box::after {
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      transform: translateX(-100%);
+      background-image: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.5) 50%,
+        rgba(255, 255, 255, 0) 100%
+      );
+      animation: shimmer 1.5s infinite;
+      content: '';
+    }
+  </style>
+</head>
+<body class="h-full font-sans text-slate-900 bg-[#f8fafc] antialiased flex flex-col">
+
+  <!-- Top Demo Control Bar (Switch states: Normal, Skeleton Loading, Empty, Error) -->
+  <div class="bg-slate-900 text-white text-xs px-4 py-2 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shrink-0 z-50">
+    <div class="flex items-center space-x-2">
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">SHADCN/UI SPEC</span>
+      <span class="font-medium text-slate-300 hidden sm:inline">Manage Forms Component • Strict 3-Color Hierarchy</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <span class="text-slate-400 text-[11px]">Preview States:</span>
+      <div class="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700">
+        <button onclick="setPageState('normal')" id="btn-state-normal" class="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-slate-900 shadow-sm transition-all">Normal</button>
+        <button onclick="setPageState('loading')" id="btn-state-loading" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition-all">Loading</button>
+        <button onclick="setPageState('empty')" id="btn-state-empty" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition-all">Empty</button>
+        <button onclick="setPageState('error')" id="btn-state-error" class="px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition-all">Error</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Collapsible Sidebar -->
+    <aside id="app-sidebar" class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 transition-all duration-200 z-30 select-none">
+      <!-- Sidebar Header -->
+      <div class="h-16 flex items-center justify-between px-4 border-b border-slate-100">
+        <div class="flex items-center space-x-3 overflow-hidden">
+          <div class="w-8 h-8 rounded-lg bg-[#0f172a] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+            SMS
+          </div>
+          <div class="sidebar-text truncate">
+            <span class="font-bold text-sm tracking-tight block text-slate-900">Unique Schools</span>
+            <span class="text-[11px] font-medium text-slate-400 block -mt-0.5">Admin Portal</span>
+          </div>
+        </div>
+        <button onclick="toggleSidebar()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Toggle Sidebar">
+          <i data-lucide="panel-left" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Links -->
+      <div class="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+        <div class="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider sidebar-text">Academic Management</div>
+        
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i>
+          <span class="sidebar-text truncate">Dashboard</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+          <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+          <span class="sidebar-text truncate">Students</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+          <i data-lucide="calendar-check" class="w-4 h-4 shrink-0"></i>
+          <span class="sidebar-text truncate">Attendance</span>
+        </a>
+
+        <!-- Active Menu Item: Forms -->
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold bg-[#0f172a] text-white shadow-sm transition-colors">
+          <i data-lucide="file-text" class="w-4 h-4 shrink-0"></i>
+          <span class="sidebar-text truncate">Forms</span>
+          <span class="ml-auto text-[10px] bg-white/20 text-white font-bold px-1.5 py-0.5 rounded-full sidebar-text">142</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+          <i data-lucide="graduation-cap" class="w-4 h-4 shrink-0"></i>
+          <span class="sidebar-text truncate">Academics</span>
+        </a>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+          <i data-lucide="receipt" class="w-4 h-4 shrink-0"></i>
+          <span class="sidebar-text truncate">Fee Management</span>
+        </a>
+
+        <div class="pt-4 px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider sidebar-text">System</div>
+
+        <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+          <i data-lucide="settings" class="w-4 h-4 shrink-0"></i>
+          <span class="sidebar-text truncate">Settings</span>
+        </a>
+      </div>
+
+      <!-- User Profile in Sidebar Footer -->
+      <div class="p-3 border-t border-slate-100">
+        <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-slate-100 transition-colors">
+          <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+            KW
+          </div>
+          <div class="sidebar-text truncate">
+            <span class="font-semibold text-xs text-slate-900 block truncate">Kritika Wadhwa</span>
+            <span class="text-[10px] text-slate-500 block truncate">Admin</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-[#f8fafc]">
+      
+      <!-- Top Navigation Bar / READ Section Breadcrumbs & Academic Year -->
+      <header class="h-16 bg-white border-b border-slate-200 px-4 sm:px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
+        <!-- Breadcrumbs -->
+        <nav class="flex items-center space-x-2 text-xs font-medium text-slate-500 overflow-hidden">
+          <a href="#" class="hover:text-slate-900 transition-colors p-1 rounded hover:bg-slate-100" title="Home">
+            <i data-lucide="home" class="w-4 h-4 text-slate-600"></i>
+          </a>
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+          
+          <div class="flex items-center space-x-1.5">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-rose-600 text-white font-extrabold text-[10px] shadow-sm">
+              US
+            </span>
+            <span class="font-semibold text-slate-700 truncate">Test App School 2</span>
+          </div>
+
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+          <span class="font-bold text-slate-900 truncate">Forms</span>
+        </nav>
+
+        <!-- Right Side: Academic Year Selector + Profile Badge -->
+        <div class="flex items-center space-x-3 sm:space-x-4">
+          <div class="flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-500"></i>
+            <span class="text-slate-400 hidden sm:inline">Academic Year</span>
+            <select class="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer text-xs">
+              <option>2026 - 2027 (Current)</option>
+              <option>2025 - 2026</option>
+              <option>2024 - 2025</option>
+            </select>
+            <button class="text-slate-400 hover:text-slate-600" title="Academic session active: Term 1">
+              <i data-lucide="info" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <div class="hidden sm:flex items-center space-x-2 pl-2 border-l border-slate-200">
+            <div class="text-right">
+              <div class="text-xs font-bold text-slate-900 leading-tight">Kritika Wadhwa</div>
+              <div class="text-[10px] font-medium text-slate-500">Admin</div>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center border border-slate-300">
+              KW
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Page Content Container -->
+      <main class="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto space-y-6">
+
+        <!-- Page Header & Action Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Manage Forms</h1>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1 font-normal">
+              Create, distribute, and track responses for school forms.
+            </p>
+          </div>
+
+          <!-- Primary & Secondary Header Actions -->
+          <div class="flex items-center space-x-2.5">
+            <button onclick="handleExportData()" class="inline-flex items-center space-x-2 px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 text-xs font-semibold shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
+              <i data-lucide="download" class="w-3.5 h-3.5 text-slate-500"></i>
+              <span>Export</span>
+            </button>
+            <button onclick="openCreateSheet()" class="inline-flex items-center space-x-2 px-4 py-2 rounded-lg bg-[#0f172a] text-white hover:bg-slate-800 text-xs font-bold shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Create Form</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card Container with Data Table -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          
+          <!-- Card Header / Search & Filter Controls -->
+          <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center space-x-2.5 flex-1 max-w-md">
+              <div class="relative w-full">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none"></i>
+                <input 
+                  type="text" 
+                  id="search-input"
+                  oninput="handleSearch(this.value)"
+                  placeholder="Search forms by title..." 
+                  class="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-all font-medium"
+                />
+                <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Filter Popover Trigger -->
+              <div class="relative">
+                <button onclick="toggleFilterPopover()" id="filter-btn" class="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-sm transition-colors">
+                  <i data-lucide="filter" class="w-3.5 h-3.5 text-slate-500"></i>
+                  <span>Filters</span>
+                  <span id="active-filter-badge" class="hidden w-2 h-2 rounded-full bg-blue-600"></span>
+                </button>
+
+                <!-- Filter Popover Menu -->
+                <div id="filter-popover" class="hidden absolute left-0 mt-2 w-72 bg-white rounded-xl border border-slate-200 shadow-xl p-4 z-40 space-y-4 animate-modal">
+                  <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="text-xs font-bold text-slate-900">Filter Forms</span>
+                    <button onclick="resetFilters()" class="text-[11px] font-semibold text-blue-600 hover:underline">Reset</button>
+                  </div>
+                  
+                  <!-- Status Filter -->
+                  <div class="space-y-1.5">
+                    <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Status</label>
+                    <select id="filter-status" onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-slate-900">
+                      <option value="ALL">All Statuses</option>
+                      <option value="Published">Published</option>
+                      <option value="Draft">Draft</option>
+                    </select>
+                  </div>
+
+                  <!-- Target Audience Filter -->
+                  <div class="space-y-1.5">
+                    <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Target Audience</label>
+                    <select id="filter-target" onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-slate-900">
+                      <option value="ALL">All Audiences</option>
+                      <option value="Parent/Guardian">Parent/Guardian</option>
+                      <option value="Staff">Staff</option>
+                      <option value="Student">Student</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stats Badge & Column Controls -->
+            <div class="flex items-center space-x-3 text-xs text-slate-500 font-medium">
+              <span id="forms-count-display"><strong class="font-bold text-slate-900" id="total-count-num">142</strong> total forms</span>
+              <div class="h-4 w-px bg-slate-200"></div>
+              <button onclick="showToast('Column configuration saved', 'info')" class="text-slate-400 hover:text-slate-700 p-1 rounded hover:bg-slate-100 transition-colors" title="Customize Columns">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bulk Action Notification Bar (Enabled on Selection) -->
+          <div id="bulk-bar" class="hidden bg-slate-900 text-white px-5 py-2.5 flex items-center justify-between text-xs font-semibold transition-all">
+            <div class="flex items-center space-x-3">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white font-bold text-[10px]" id="selected-count">0</span>
+              <span>forms selected</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button onclick="bulkPublish()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs transition-colors">
+                Publish
+              </button>
+              <button onclick="bulkUnpublish()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs transition-colors">
+                Unpublish
+              </button>
+              <button onclick="bulkDeletePrompt()" class="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors">
+                Delete
+              </button>
+              <button onclick="clearSelection()" class="text-slate-400 hover:text-white p-1 ml-2">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 1. NORMAL STATE: Data Table -->
+          <div id="state-normal-container" class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold text-slate-500 uppercase tracking-wider sticky top-0 z-10 select-none">
+                  <th class="py-3.5 px-4 w-10 text-center">
+                    <input 
+                      type="checkbox" 
+                      id="select-all-checkbox"
+                      onchange="toggleSelectAll(this.checked)"
+                      class="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 focus:ring-offset-0 cursor-pointer"
+                    />
+                  </th>
+                  <th class="py-3.5 px-4 font-bold">FORM DETAILS</th>
+                  <th class="py-3.5 px-4 font-bold">STATUS</th>
+                  <th class="py-3.5 px-4 font-bold">RESPONSES</th>
+                  <th class="py-3.5 px-4 font-bold">TIMELINE</th>
+                  <th class="py-3.5 px-4 font-bold">AUTHOR</th>
+                  <th class="py-3.5 px-4 text-right"></th>
+                </tr>
+              </thead>
+              <tbody id="forms-table-body" class="divide-y divide-slate-100 font-medium text-slate-700">
+                <!-- Dynamically Rendered Rows via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 2. SKELETON LOADING STATE -->
+          <div id="state-loading-container" class="hidden p-6 space-y-4">
+            <div class="flex items-center space-x-4 border-b border-slate-100 pb-3">
+              <div class="w-4 h-4 rounded skeleton-box"></div>
+              <div class="w-48 h-4 rounded skeleton-box"></div>
+              <div class="w-20 h-4 rounded skeleton-box ml-auto"></div>
+            </div>
+            <!-- Repeated skeleton rows -->
+            <div class="space-y-3">
+              <div class="flex items-center space-x-4 py-3">
+                <div class="w-4 h-4 rounded skeleton-box"></div>
+                <div class="space-y-1.5 flex-1">
+                  <div class="w-64 h-3.5 rounded skeleton-box"></div>
+                  <div class="w-32 h-2.5 rounded skeleton-box"></div>
+                </div>
+                <div class="w-20 h-6 rounded-full skeleton-box"></div>
+                <div class="w-36 h-3 rounded skeleton-box"></div>
+                <div class="w-28 h-3 rounded skeleton-box"></div>
+                <div class="w-24 h-3 rounded skeleton-box"></div>
+              </div>
+
+              <div class="flex items-center space-x-4 py-3">
+                <div class="w-4 h-4 rounded skeleton-box"></div>
+                <div class="space-y-1.5 flex-1">
+                  <div class="w-72 h-3.5 rounded skeleton-box"></div>
+                  <div class="w-36 h-2.5 rounded skeleton-box"></div>
+                </div>
+                <div class="w-20 h-6 rounded-full skeleton-box"></div>
+                <div class="w-36 h-3 rounded skeleton-box"></div>
+                <div class="w-28 h-3 rounded skeleton-box"></div>
+                <div class="w-24 h-3 rounded skeleton-box"></div>
+              </div>
+
+              <div class="flex items-center space-x-4 py-3">
+                <div class="w-4 h-4 rounded skeleton-box"></div>
+                <div class="space-y-1.5 flex-1">
+                  <div class="w-56 h-3.5 rounded skeleton-box"></div>
+                  <div class="w-28 h-2.5 rounded skeleton-box"></div>
+                </div>
+                <div class="w-20 h-6 rounded-full skeleton-box"></div>
+                <div class="w-36 h-3 rounded skeleton-box"></div>
+                <div class="w-28 h-3 rounded skeleton-box"></div>
+                <div class="w-24 h-3 rounded skeleton-box"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. EMPTY STATE -->
+          <div id="state-empty-container" class="hidden py-16 px-4 text-center space-y-4">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200">
+              <i data-lucide="file-question" class="w-7 h-7"></i>
+            </div>
+            <div class="max-w-sm mx-auto space-y-1">
+              <h3 class="text-base font-bold text-slate-900">No forms found</h3>
+              <p class="text-xs text-slate-500">
+                No matching forms were found for your current search or filters. Try adjusting your terms or create a new form.
+              </p>
+            </div>
+            <div class="pt-2 flex items-center justify-center space-x-2">
+              <button onclick="clearSearch()" class="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-sm transition-colors">
+                Clear Filters
+              </button>
+              <button onclick="openCreateSheet()" class="px-3.5 py-1.5 rounded-lg bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-colors">
+                + Create Form
+              </button>
+            </div>
+          </div>
+
+          <!-- 4. ERROR STATE -->
+          <div id="state-error-container" class="hidden py-16 px-4 text-center space-y-4">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
+              <i data-lucide="alert-triangle" class="w-7 h-7"></i>
+            </div>
+            <div class="max-w-sm mx-auto space-y-1">
+              <h3 class="text-base font-bold text-slate-900">Unable to load forms</h3>
+              <p class="text-xs text-slate-500">
+                A network error occurred while retrieving data from the school server. Please try again.
+              </p>
+            </div>
+            <div class="pt-2">
+              <button onclick="retryLoadForms()" class="inline-flex items-center space-x-2 px-4 py-2 rounded-lg bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-colors">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Retry Connection</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Table Footer / Infinite Scrolling & Pagination Info -->
+          <div class="p-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+            <span id="pagination-text">Showing <strong class="text-slate-900">1 to 4</strong> of <strong class="text-slate-900">142</strong> forms</span>
+            
+            <div class="flex items-center space-x-1 font-semibold">
+              <button class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 text-slate-600 disabled:opacity-40" disabled>
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+              </button>
+              <button class="w-8 h-8 rounded-lg bg-[#0f172a] text-white flex items-center justify-center shadow-sm">1</button>
+              <button onclick="showToast('Loading page 2...', 'info')" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 text-slate-700">2</button>
+              <button onclick="showToast('Loading page 3...', 'info')" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 text-slate-700">3</button>
+              <span class="px-1 text-slate-400">...</span>
+              <button onclick="showToast('Loading page 10...', 'info')" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 text-slate-700">10</button>
+              <button onclick="showToast('Loading page 2...', 'info')" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 text-slate-600">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MODAL 1: VIEW DETAILS MODAL
+       ============================================================ -->
+  <div id="view-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-modal">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <span id="modal-status-badge" class="px-2 py-0.5 rounded-md text-[10px] font-bold"></span>
+          <h3 id="modal-title" class="text-base font-bold text-slate-900 truncate max-w-xs"></h3>
+        </div>
+        <button onclick="closeViewModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs text-slate-600">
+        <!-- Target & Author Grid -->
+        <div class="grid grid-cols-2 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Target Group</span>
+            <span id="modal-target" class="text-xs font-bold text-slate-900 flex items-center space-x-1 mt-0.5">
+              <i data-lucide="users" class="w-3.5 h-3.5 text-slate-500"></i>
+              <span id="modal-target-text"></span>
+            </span>
+          </div>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Author / Creator</span>
+            <span id="modal-author" class="text-xs font-bold text-slate-900 block mt-0.5"></span>
+          </div>
+        </div>
+
+        <!-- Responses Progress -->
+        <div class="space-y-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+          <div class="flex justify-between items-center text-xs font-semibold">
+            <span class="text-slate-600">Response Rate</span>
+            <span id="modal-response-count" class="font-bold text-slate-900"></span>
+          </div>
+          <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+            <div id="modal-progress-bar" class="h-full bg-blue-600 rounded-full transition-all"></div>
+          </div>
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span id="modal-pending-text"></span>
+            <span id="modal-completion-percent"></span>
+          </div>
+        </div>
+
+        <!-- Form Questions Preview List -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Form Questions & Fields (3)</h4>
+          <div class="space-y-1.5 text-[11px]">
+            <div class="p-2.5 rounded-lg border border-slate-100 bg-white flex items-center justify-between">
+              <span class="font-medium text-slate-800">1. Student Full Name & Roll Number</span>
+              <span class="text-slate-400 font-mono text-[10px]">Short Text</span>
+            </div>
+            <div class="p-2.5 rounded-lg border border-slate-100 bg-white flex items-center justify-between">
+              <span class="font-medium text-slate-800">2. Emergency Contact Phone</span>
+              <span class="text-slate-400 font-mono text-[10px]">Phone Number</span>
+            </div>
+            <div class="p-2.5 rounded-lg border border-slate-100 bg-white flex items-center justify-between">
+              <span class="font-medium text-slate-800">3. Parent Consent & Signature</span>
+              <span class="text-slate-400 font-mono text-[10px]">Signature</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-2">
+        <button onclick="closeViewModal()" class="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-sm">Close</button>
+        <button onclick="editFromModal()" class="px-3.5 py-1.5 rounded-lg bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-bold shadow-sm">Edit Form</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SIDE SHEET: CREATE / EDIT FORM (Right Slide-over Panel)
+       ============================================================ -->
+  <div id="form-sheet" class="hidden fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-sheet border-l border-slate-200">
+      
+      <!-- Sheet Header -->
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div>
+          <h2 id="sheet-heading" class="text-base font-bold text-slate-900">Create New Form</h2>
+          <p class="text-xs text-slate-500">Configure parameters, audience, and deadlines.</p>
+        </div>
+        <button onclick="closeFormSheet()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Sheet Form Body -->
+      <form id="side-form" onsubmit="handleSaveForm(event)" class="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+        <input type="hidden" id="edit-form-id" value="">
+
+        <!-- Form Title -->
+        <div class="space-y-1.5">
+          <label class="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">Form Title <span class="text-rose-500">*</span></label>
+          <input 
+            type="text" 
+            id="form-title-input" 
+            placeholder="e.g. Annual Parent Consent Form" 
+            required 
+            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-slate-900 font-medium"
+          />
+        </div>
+
+        <!-- Target Audience Selection -->
+        <div class="space-y-1.5">
+          <label class="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">Target Audience <span class="text-rose-500">*</span></label>
+          <select id="form-target-input" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-slate-900 font-medium">
+            <option value="Parent/Guardian">Parent/Guardian</option>
+            <option value="Staff">Staff</option>
+            <option value="Student">Student</option>
+          </select>
+        </div>
+
+        <!-- Status -->
+        <div class="space-y-1.5">
+          <label class="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">Initial Status</label>
+          <select id="form-status-input" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-slate-900 font-medium">
+            <option value="Draft">Draft (Not distributed yet)</option>
+            <option value="Published">Published (Active distribution)</option>
+          </select>
+        </div>
+
+        <!-- Due Date -->
+        <div class="space-y-1.5">
+          <label class="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">Due Date Deadline</label>
+          <input 
+            type="date" 
+            id="form-duedate-input"
+            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-slate-900 font-medium"
+          />
+        </div>
+
+        <!-- Description Note -->
+        <div class="space-y-1.5">
+          <label class="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">Description / Instructions</label>
+          <textarea 
+            id="form-desc-input" 
+            rows="3" 
+            placeholder="Provide clear instructions for recipients filling this form..."
+            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-slate-900 font-medium resize-none"
+          ></textarea>
+        </div>
+
+        <!-- Form Security Options -->
+        <div class="pt-2 border-t border-slate-100 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-700">Require Digital Signature</span>
+            <input type="checkbox" checked class="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900">
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-700">Allow Multiple Submissions</span>
+            <input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900">
+          </div>
+        </div>
+
+        <!-- Sheet Footer Actions -->
+        <div class="pt-6 border-t border-slate-100 flex items-center justify-end space-x-2">
+          <button type="button" onclick="closeFormSheet()" class="px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-sm">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-bold shadow-sm">Save Form</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MODAL 2: CONFIRMATION MODAL (Destructive Action)
+       ============================================================ -->
+  <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 animate-modal space-y-4">
+      <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
+        <i data-lucide="trash-2" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 id="confirm-title" class="text-base font-bold text-slate-900">Delete Form?</h3>
+        <p id="confirm-message" class="text-xs text-slate-500 mt-1">
+          Are you sure you want to permanently delete this form? Any submitted responses will be archived.
+        </p>
+      </div>
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button onclick="closeConfirmModal()" class="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700">Cancel</button>
+        <button id="confirm-action-btn" onclick="executeConfirmedAction()" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- ============================================================
+       APPLICATION LOGIC & INTERACTION JAVASCRIPT
+       ============================================================ -->
+  <script>
+    // Initial dataset replicating the screenshots
+    let formsData = [
+      {
+        id: 1,
+        title: "Form CUSTOM Reminder",
+        target: "Parent/Guardian",
+        status: "Draft",
+        submitted: 0,
+        total: 0,
+        pendingText: "Not distributed yet",
+        timelinePrimary: "Modified: 03 Aug 2026",
+        timelineSecondary: "Created: 03 Aug 2026",
+        author: "Kritika Wadhwa",
+        isOverdue: false
+      },
+      {
+        id: 2,
+        title: "Form 24 July Everyday Reminder",
+        target: "Parent/Guardian",
+        status: "Published",
+        submitted: 120,
+        total: 244,
+        pendingText: "124 pending responses",
+        timelinePrimary: "Due: 31 Jul 2026",
+        timelineSecondary: "Mod: 24 Jul 2026",
+        author: "Kritika Wadhwa",
+        isOverdue: false
+      },
+      {
+        id: 3,
+        title: "Form 23 July Everyday Reminder Check",
+        target: "Parent/Guardian",
+        status: "Published",
+        submitted: 500,
+        total: 512,
+        pendingText: "Almost complete (12 pending)",
+        timelinePrimary: "Due: 31 Aug 2026",
+        timelineSecondary: "Mod: 23 Jul 2026",
+        author: "Priya Chherke",
+        isOverdue: false
+      },
+      {
+        id: 4,
+        title: "Everyday Reminder 21 July at 7:00",
+        target: "Staff",
+        status: "Published",
+        submitted: 0,
+        total: 294,
+        pendingText: "Awaiting responses",
+        timelinePrimary: "Overdue (30 Jul)",
+        timelineSecondary: "Mod: 22 Jul 2026",
+        author: "Kritika Wadhwa",
+        isOverdue: true
+      },
+      {
+        id: 5,
+        title: "Annual Sports Day Consent Form",
+        target: "Parent/Guardian",
+        status: "Published",
+        submitted: 310,
+        total: 350,
+        pendingText: "40 pending responses",
+        timelinePrimary: "Due: 15 Sep 2026",
+        timelineSecondary: "Mod: 01 Aug 2026",
+        author: "Kritika Wadhwa",
+        isOverdue: false
+      },
+      {
+        id: 6,
+        title: "Staff Cybersecurity Compliance Survey",
+        target: "Staff",
+        status: "Published",
+        submitted: 85,
+        total: 90,
+        pendingText: "5 pending responses",
+        timelinePrimary: "Due: 20 Aug 2026",
+        timelineSecondary: "Mod: 02 Aug 2026",
+        author: "Kritika Wadhwa",
+        isOverdue: false
+      }
+    ];
+
+    let selectedIds = new Set();
+    let currentFilterStatus = 'ALL';
+    let currentFilterTarget = 'ALL';
+    let currentSearchTerm = '';
+    let pendingAction = null;
+    let viewingForm = null;
+
+    // Render Table Rows
+    function renderTable() {
+      const tbody = document.getElementById('forms-table-body');
+      tbody.innerHTML = '';
+
+      const filtered = formsData.filter(form => {
+        const matchesSearch = form.title.toLowerCase().includes(currentSearchTerm.toLowerCase()) || 
+                              form.author.toLowerCase().includes(currentSearchTerm.toLowerCase());
+        const matchesStatus = currentFilterStatus === 'ALL' || form.status === currentFilterStatus;
+        const matchesTarget = currentFilterTarget === 'ALL' || form.target === currentFilterTarget;
+        return matchesSearch && matchesStatus && matchesTarget;
+      });
+
+      document.getElementById('total-count-num').innerText = filtered.length;
+
+      if (filtered.length === 0) {
+        setPageState('empty');
+        return;
+      } else {
+        document.getElementById('state-normal-container').classList.remove('hidden');
+        document.getElementById('state-empty-container').classList.add('hidden');
+      }
+
+      filtered.forEach(form => {
+        const isSelected = selectedIds.has(form.id);
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-slate-50/80 transition-colors group cursor-pointer ${isSelected ? 'bg-blue-50/40' : ''}`;
+
+        // Responses HTML
+        let responseHtml = '';
+        if (form.status === 'Draft' || form.total === 0) {
+          responseHtml = `<span class="italic text-slate-400 text-xs">${form.pendingText}</span>`;
+        } else {
+          const percent = Math.round((form.submitted / form.total) * 100);
+          const isHigh = percent > 85;
+          const barColor = isHigh ? 'bg-emerald-500' : 'bg-blue-600';
+          const subtextColor = isHigh ? 'text-emerald-600 font-semibold' : form.submitted === 0 ? 'text-amber-600 font-semibold' : 'text-amber-600';
+
+          responseHtml = `
+            <div class="space-y-1">
+              <div class="flex items-center space-x-1.5 text-xs font-semibold">
+                <span class="font-bold text-slate-900">${form.submitted} submitted</span>
+                <span class="text-slate-400 font-normal">/ ${form.total} total</span>
+              </div>
+              <div class="w-36 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full ${barColor} rounded-full" style="width: ${percent}%"></div>
+              </div>
+              <div class="text-[11px] ${subtextColor}">${form.pendingText}</div>
+            </div>
+          `;
+        }
+
+        // Status Badge HTML
+        let statusBadge = '';
+        if (form.status === 'Draft') {
+          statusBadge = `
+            <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              <i data-lucide="edit-3" class="w-3 h-3 text-slate-500"></i>
+              <span>Draft</span>
+            </span>
+          `;
+        } else {
+          statusBadge = `
+            <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
+              <span>Published</span>
+            </span>
+          `;
+        }
+
+        // Timeline HTML
+        const timelinePrimaryClass = form.isOverdue ? 'text-rose-600 font-bold flex items-center space-x-1' : 'text-slate-600 flex items-center space-x-1';
+        const timelineIcon = form.isOverdue 
+          ? `<i data-lucide="alert-circle" class="w-3 h-3 text-rose-500"></i>` 
+          : `<i data-lucide="clock" class="w-3 h-3 text-slate-400"></i>`;
+
+        tr.innerHTML = `
+          <td class="py-4 px-4 text-center" onclick="event.stopPropagation()">
+            <input 
+              type="checkbox" 
+              value="${form.id}"
+              ${isSelected ? 'checked' : ''}
+              onchange="handleRowSelect(${form.id}, this.checked)"
+              class="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+            />
+          </td>
+          <td class="py-4 px-4 font-bold text-slate-900" onclick="openViewModal(${form.id})">
+            <div class="hover:underline text-slate-900">${form.title}</div>
+            <div class="text-[11px] font-normal text-slate-500 flex items-center space-x-1 mt-0.5">
+              <i data-lucide="users" class="w-3 h-3 text-slate-400"></i>
+              <span>Target: ${form.target}</span>
+            </div>
+          </td>
+          <td class="py-4 px-4" onclick="openViewModal(${form.id})">${statusBadge}</td>
+          <td class="py-4 px-4" onclick="openViewModal(${form.id})">${responseHtml}</td>
+          <td class="py-4 px-4 text-xs" onclick="openViewModal(${form.id})">
+            <div class="${timelinePrimaryClass}">${timelineIcon}<span>${form.timelinePrimary}</span></div>
+            <div class="text-[10px] text-slate-400 mt-0.5">${form.timelineSecondary}</div>
+          </td>
+          <td class="py-4 px-4 text-xs font-semibold text-slate-700" onclick="openViewModal(${form.id})">${form.author}</td>
+          <td class="py-4 px-4 text-right" onclick="event.stopPropagation()">
+            <div class="relative inline-block text-left">
+              <button onclick="toggleActionMenu(event, ${form.id})" class="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors">
+                <i data-lucide="more-vertical" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      lucide.createIcons();
+      updateBulkBar();
+    }
+
+    // Row selection & Bulk Action handlers
+    function handleRowSelect(id, isChecked) {
+      if (isChecked) {
+        selectedIds.add(id);
+      } else {
+        selectedIds.delete(id);
+      }
+      renderTable();
+    }
+
+    function toggleSelectAll(isChecked) {
+      if (isChecked) {
+        formsData.forEach(f => selectedIds.add(f.id));
+      } else {
+        selectedIds.clear();
+      }
+      renderTable();
+    }
+
+    function clearSelection() {
+      selectedIds.clear();
+      document.getElementById('select-all-checkbox').checked = false;
+      renderTable();
+    }
+
+    function updateBulkBar() {
+      const bar = document.getElementById('bulk-bar');
+      const countSpan = document.getElementById('selected-count');
+      const selectAll = document.getElementById('select-all-checkbox');
+
+      if (selectedIds.size > 0) {
+        bar.classList.remove('hidden');
+        countSpan.innerText = selectedIds.size;
+        selectAll.checked = selectedIds.size === formsData.length;
+      } else {
+        bar.classList.add('hidden');
+        selectAll.checked = false;
+      }
+    }
+
+    function bulkPublish() {
+      formsData.forEach(f => {
+        if (selectedIds.has(f.id)) f.status = 'Published';
+      });
+      showToast(`${selectedIds.size} forms published successfully`, 'success');
+      clearSelection();
+    }
+
+    function bulkUnpublish() {
+      formsData.forEach(f => {
+        if (selectedIds.has(f.id)) f.status = 'Draft';
+      });
+      showToast(`${selectedIds.size} forms changed to draft`, 'info');
+      clearSelection();
+    }
+
+    function bulkDeletePrompt() {
+      promptConfirm(
+        `Delete ${selectedIds.size} Forms?`,
+        `Are you sure you want to delete these ${selectedIds.size} selected forms? This action cannot be undone.`,
+        () => {
+          formsData = formsData.filter(f => !selectedIds.has(f.id));
+          showToast(`${selectedIds.size} forms deleted`, 'error');
+          clearSelection();
+        }
+      );
+    }
+
+    // Search and Filters
+    function handleSearch(val) {
+      currentSearchTerm = val;
+      document.getElementById('clear-search').classList.toggle('hidden', val.length === 0);
+      renderTable();
+    }
+
+    function clearSearch() {
+      document.getElementById('search-input').value = '';
+      currentSearchTerm = '';
+      document.getElementById('clear-search').classList.add('hidden');
+      renderTable();
+    }
+
+    function toggleFilterPopover() {
+      document.getElementById('filter-popover').classList.toggle('hidden');
+    }
+
+    function applyFilters() {
+      currentFilterStatus = document.getElementById('filter-status').value;
+      currentFilterTarget = document.getElementById('filter-target').value;
+      const isFiltered = currentFilterStatus !== 'ALL' || currentFilterTarget !== 'ALL';
+      document.getElementById('active-filter-badge').classList.toggle('hidden', !isFiltered);
+      renderTable();
+    }
+
+    function resetFilters() {
+      document.getElementById('filter-status').value = 'ALL';
+      document.getElementById('filter-target').value = 'ALL';
+      applyFilters();
+      toggleFilterPopover();
+    }
+
+    // View Modal
+    function openViewModal(id) {
+      const form = formsData.find(f => f.id === id);
+      if (!form) return;
+      viewingForm = form;
+
+      document.getElementById('modal-title').innerText = form.title;
+      document.getElementById('modal-target-text').innerText = form.target;
+      document.getElementById('modal-author').innerText = form.author;
+      
+      const badge = document.getElementById('modal-status-badge');
+      badge.innerText = form.status;
+      badge.className = form.status === 'Published' 
+        ? 'px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200' 
+        : 'px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200';
+
+      const count = document.getElementById('modal-response-count');
+      const bar = document.getElementById('modal-progress-bar');
+      const pending = document.getElementById('modal-pending-text');
+      const comp = document.getElementById('modal-completion-percent');
+
+      if (form.total > 0) {
+        const percent = Math.round((form.submitted / form.total) * 100);
+        count.innerText = `${form.submitted} / ${form.total} (${percent}%)`;
+        bar.style.width = `${percent}%`;
+        pending.innerText = form.pendingText;
+        comp.innerText = `${percent}% Completed`;
+      } else {
+        count.innerText = '0 / 0 (0%)';
+        bar.style.width = '0%';
+        pending.innerText = 'Not distributed';
+        comp.innerText = '0% Completed';
+      }
+
+      document.getElementById('view-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeViewModal() {
+      document.getElementById('view-modal').classList.add('hidden');
+    }
+
+    function editFromModal() {
+      closeViewModal();
+      if (viewingForm) openEditSheet(viewingForm.id);
+    }
+
+    // Create / Edit Side Sheet
+    function openCreateSheet() {
+      document.getElementById('sheet-heading').innerText = 'Create New Form';
+      document.getElementById('edit-form-id').value = '';
+      document.getElementById('form-title-input').value = '';
+      document.getElementById('form-target-input').value = 'Parent/Guardian';
+      document.getElementById('form-status-input').value = 'Published';
+      document.getElementById('form-duedate-input').value = '2026-08-31';
+      document.getElementById('form-desc-input').value = '';
+      document.getElementById('form-sheet').classList.remove('hidden');
+    }
+
+    function openEditSheet(id) {
+      const form = formsData.find(f => f.id === id);
+      if (!form) return;
+      document.getElementById('sheet-heading').innerText = 'Edit Form';
+      document.getElementById('edit-form-id').value = form.id;
+      document.getElementById('form-title-input').value = form.title;
+      document.getElementById('form-target-input').value = form.target;
+      document.getElementById('form-status-input').value = form.status;
+      document.getElementById('form-duedate-input').value = '2026-08-31';
+      document.getElementById('form-sheet').classList.remove('hidden');
+    }
+
+    function closeFormSheet() {
+      document.getElementById('form-sheet').classList.add('hidden');
+    }
+
+    function handleSaveForm(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-form-id').value;
+      const title = document.getElementById('form-title-input').value;
+      const target = document.getElementById('form-target-input').value;
+      const status = document.getElementById('form-status-input').value;
+
+      if (id) {
+        const existing = formsData.find(f => f.id === parseInt(id));
+        if (existing) {
+          existing.title = title;
+          existing.target = target;
+          existing.status = status;
+        }
+        showToast('Form updated successfully', 'success');
+      } else {
+        const newForm = {
+          id: Date.now(),
+          title: title,
+          target: target,
+          status: status,
+          submitted: 0,
+          total: target === 'Staff' ? 95 : 250,
+          pendingText: status === 'Draft' ? 'Not distributed yet' : 'Awaiting responses',
+          timelinePrimary: 'Due: 31 Aug 2026',
+          timelineSecondary: 'Created: Today',
+          author: 'Kritika Wadhwa',
+          isOverdue: false
+        };
+        formsData.unshift(newForm);
+        showToast('New form created successfully', 'success');
+      }
+
+      closeFormSheet();
+      renderTable();
+    }
+
+    // Confirmation Modal
+    function promptConfirm(title, message, onConfirm) {
+      document.getElementById('confirm-title').innerText = title;
+      document.getElementById('confirm-message').innerText = message;
+      pendingAction = onConfirm;
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      pendingAction = null;
+    }
+
+    function executeConfirmedAction() {
+      if (pendingAction) pendingAction();
+      closeConfirmModal();
+    }
+
+    // Row Action Menu popup
+    function toggleActionMenu(e, id) {
+      e.stopPropagation();
+      openViewModal(id);
+    }
+
+    // Toast System
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let icon = 'check-circle-2';
+      let iconColor = 'text-emerald-500';
+      if (type === 'error') { icon = 'alert-circle'; iconColor = 'text-rose-500'; }
+      if (type === 'info') { icon = 'info'; iconColor = 'text-blue-500'; }
+
+      toast.className = 'pointer-events-auto flex items-center space-x-2.5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl text-xs font-semibold border border-slate-800 animate-toast';
+      toast.innerHTML = `
+        <i data-lucide="${icon}" class="w-4 h-4 ${iconColor} shrink-0"></i>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        toast.style.transition = 'all 0.2s ease';
+        setTimeout(() => toast.remove(), 200);
+      }, 3000);
+    }
+
+    // State Switcher (Normal, Loading, Empty, Error)
+    function setPageState(state) {
+      ['normal', 'loading', 'empty', 'error'].forEach(s => {
+        const btn = document.getElementById(`btn-state-${s}`);
+        const container = document.getElementById(`state-${s}-container`);
+        if (s === state) {
+          btn.className = 'px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-slate-900 shadow-sm transition-all';
+          if (container) container.classList.remove('hidden');
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-white transition-all';
+          if (container) container.classList.add('hidden');
+        }
+      });
+      if (state === 'normal') renderTable();
+      lucide.createIcons();
+    }
+
+    function retryLoadForms() {
+      setPageState('loading');
+      setTimeout(() => {
+        setPageState('normal');
+        showToast('Forms reloaded successfully', 'success');
+      }, 800);
+    }
+
+    function handleExportData() {
+      showToast('Exporting 142 form records to CSV...', 'info');
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('app-sidebar');
+      const texts = document.querySelectorAll('.sidebar-text');
+      sidebar.classList.toggle('w-64');
+      sidebar.classList.toggle('w-16');
+      texts.forEach(t => t.classList.toggle('hidden'));
+    }
+
+    // Keyboard Shortcuts (Esc closes modals/sheets)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeViewModal();
+        closeFormSheet();
+        closeConfirmModal();
+        document.getElementById('filter-popover').classList.add('hidden');
+      }
+    });
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      renderTable();
+    });
+  </script>
+</body>
+</html>

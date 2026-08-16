@@ -10,6 +10,7 @@ import { ShieldCheck, RefreshCw, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function HomePage() {
+  const [isMounted, setIsMounted] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [guardState, setGuardState] = useState<QuizStatusState | null>(null);
@@ -19,6 +20,7 @@ export default function HomePage() {
   const [submissionResult, setSubmissionResult] = useState<any>(null);
 
   useEffect(() => {
+    setIsMounted(true);
     const savedName = localStorage.getItem('cyber_quiz_username');
     if (savedName) {
       setUserName(savedName);
@@ -27,6 +29,7 @@ export default function HomePage() {
       setIsLoading(false);
     }
   }, []);
+
 
   const checkUserSession = async (name: string) => {
     setIsLoading(true);
@@ -115,11 +118,22 @@ export default function HomePage() {
     setSubmissionResult(null);
   };
 
+  // 0. Server-side / Hydration loading placeholder
+  if (!isMounted) {
+    return (
+      <div className="py-24 text-center text-slate-400 space-y-4">
+        <RefreshCw className="w-10 h-10 mx-auto animate-spin text-slate-400" />
+        <p className="text-base font-semibold">Loading session...</p>
+      </div>
+    );
+  }
+
   // 1. No active session username set
   if (!userName) {
     const lastSavedName = typeof window !== 'undefined' ? (localStorage.getItem('cyber_quiz_username') || '') : '';
     return <NameEntryModal initialName={lastSavedName} onSave={handleSaveIdentity} />;
   }
+
 
   // 2. Loading state
   if (isLoading) {
@@ -150,14 +164,14 @@ export default function HomePage() {
   if (guardState && guardState !== 'OPEN') {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between max-w-xl mx-auto px-2 text-xs text-slate-400">
+        <div className="flex items-center justify-between max-w-xl mx-auto px-2 text-xs text-slate-500 dark:text-slate-400">
           <span className="flex items-center space-x-1.5">
-            <UserCheck className="w-4 h-4 text-cyber-accent" />
-            <span>Identity: <strong className="text-white">{userName}</strong></span>
+            <UserCheck className="w-4 h-4 text-slate-700 dark:text-cyber-accent" />
+            <span>Identity: <strong className="text-slate-900 dark:text-white font-bold">{userName}</strong></span>
           </span>
           <button
             onClick={handleChangeName}
-            className="text-cyber-accent hover:underline text-[11px] font-semibold"
+            className="text-indigo-600 dark:text-cyan-400 hover:underline text-[11px] font-semibold"
           >
             Change Nickname
           </button>
@@ -176,14 +190,14 @@ export default function HomePage() {
   if (questionData) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between max-w-2xl mx-auto px-2 text-xs text-slate-400">
+        <div className="flex items-center justify-between max-w-2xl mx-auto px-2 text-xs text-slate-500 dark:text-slate-400">
           <span className="flex items-center space-x-1.5">
-            <ShieldCheck className="w-4 h-4 text-cyber-accent" />
-            <span>Logged in as: <strong className="text-white">{userName}</strong></span>
+            <ShieldCheck className="w-4 h-4 text-slate-700 dark:text-cyber-accent" />
+            <span>Logged in as: <strong className="text-slate-900 dark:text-white font-bold">{userName}</strong></span>
           </span>
           <button
             onClick={handleChangeName}
-            className="text-slate-400 hover:text-white text-[11px]"
+            className="text-indigo-600 dark:text-slate-400 hover:text-indigo-800 dark:hover:text-white text-[11px] font-semibold"
           >
             Switch identity
           </button>

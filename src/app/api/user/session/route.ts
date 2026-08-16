@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const { userName } = validation.data;
     const guard = await getDynamicQuizGuardStatus();
 
-    // Check if user already attempted today
+    // Check if user already attempted today — Strictly ONE QUESTION PER DAY
     const existingAttempt = await dataService.getUserAttemptToday(userName, guard.quizDate);
 
     if (existingAttempt) {
@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+
+
 
     return NextResponse.json({
       success: true,
