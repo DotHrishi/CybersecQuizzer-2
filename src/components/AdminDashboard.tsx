@@ -8,7 +8,9 @@ import {
   ChevronDown, ChevronUp, SlidersHorizontal,
   CheckSquare, Square, Minus, AlertCircle, Loader2,
   CheckCircle2, ArrowRight, BarChart3, FileText,
-  Trophy, Clock, Target, TrendingUp, Hash, ChevronsUpDown,
+  Trophy, Clock, Target, TrendingUp, Hash, ChevronsUpDown, Award,
+  ShieldAlert, Layers, CalendarDays, Flame,
+  AlertOctagon, CheckCircle, XCircle, TrendingDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,7 +32,7 @@ interface LeaderboardEntry {
 }
 
 type AdminTab = 'questions' | 'reports';
-type ReportTab = 'overview' | 'students' | 'attempts' | 'qbank';
+type ReportTab = 'overview' | 'students' | 'attempts' | 'qbank' | 'risk' | 'category' | 'engagement' | 'trend';
 type BulkAction = 'enable' | 'disable' | 'delete' | 'export';
 type BulkStep = 'select' | 'configure' | 'confirm' | 'processing' | 'result';
 type FilterDifficulty = 'All' | 'Easy' | 'Medium' | 'Hard';
@@ -315,6 +317,195 @@ function exportPDF(title: string, html: string) {
   setTimeout(() => { win.print(); win.addEventListener('afterprint', () => win.close()); }, 400);
 }
 
+/* ─── Certificate generator ─────────────────────────────── */
+function downloadCertificate(u: LeaderboardEntry) {
+  const accuracy = u.attempts ? Math.round((u.correctAnswers / u.attempts) * 100) : 0;
+  const issuedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const win = window.open('', '_blank', 'width=1000,height=720');
+  if (!win) { toast.error('Pop-up blocked — allow pop-ups and try again.'); return; }
+
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Certificate – ${u.userName}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Open+Sans:wght@400;600&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Open Sans', Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 32px;
+    }
+    .cert {
+      width: 860px;
+      background: #fff;
+      border: 12px solid #0f172a;
+      outline: 4px solid #c9a84c;
+      outline-offset: -20px;
+      padding: 60px 72px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,.18);
+    }
+    .corner {
+      position: absolute;
+      width: 60px; height: 60px;
+      border-color: #c9a84c;
+      border-style: solid;
+    }
+    .tl { top: 10px; left: 10px; border-width: 3px 0 0 3px; }
+    .tr { top: 10px; right: 10px; border-width: 3px 3px 0 0; }
+    .bl { bottom: 10px; left: 10px; border-width: 0 0 3px 3px; }
+    .br { bottom: 10px; right: 10px; border-width: 0 3px 3px 0; }
+    .seal {
+      width: 72px; height: 72px;
+      background: #0f172a;
+      border-radius: 50%;
+      margin: 0 auto 24px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .seal svg { width: 38px; height: 38px; fill: #c9a84c; }
+    .programme {
+      font-size: 11pt;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .title {
+      font-family: 'Cinzel', serif;
+      font-size: 28pt;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.15;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 10pt;
+      color: #94a3b8;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+    .divider {
+      width: 120px; height: 2px;
+      background: linear-gradient(90deg, transparent, #c9a84c, transparent);
+      margin: 0 auto 32px;
+    }
+    .presented { font-size: 10pt; color: #64748b; margin-bottom: 8px; }
+    .name {
+      font-family: 'Cinzel', serif;
+      font-size: 32pt;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 2px solid #0f172a;
+      display: inline-block;
+      padding-bottom: 4px;
+      margin-bottom: 28px;
+      min-width: 360px;
+    }
+    .body-text {
+      font-size: 11pt;
+      color: #334155;
+      line-height: 1.65;
+      max-width: 560px;
+      margin: 0 auto 32px;
+    }
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      margin-bottom: 36px;
+    }
+    .stat { text-align: center; }
+    .stat-val {
+      font-size: 22pt;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1;
+    }
+    .stat-lbl { font-size: 8pt; color: #94a3b8; text-transform: uppercase; letter-spacing: .1em; margin-top: 4px; }
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .sig-block { text-align: center; }
+    .sig-line { width: 180px; border-bottom: 1.5px solid #0f172a; margin: 0 auto 6px; height: 32px; }
+    .sig-label { font-size: 8pt; color: #94a3b8; text-transform: uppercase; letter-spacing: .08em; }
+    .date-block { text-align: right; font-size: 9pt; color: #64748b; }
+    @media print {
+      body { background: white; padding: 0; }
+      .cert { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="cert">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="seal">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 1l2.7 5.47L21 7.64l-4.5 4.39 1.06 6.2L12 15.27l-5.56 2.96 1.06-6.2L3 7.64l6.3-.91L12 1z"/>
+      </svg>
+    </div>
+    <p class="programme">Cybersecurity Awareness &amp; Digital Safety Programme</p>
+    <h1 class="title">Certificate of Achievement</h1>
+    <p class="subtitle">Issued with distinction</p>
+    <div class="divider"></div>
+    <p class="presented">This certificate is proudly presented to</p>
+    <div class="name">${u.userName}</div>
+    <p class="body-text">
+      for outstanding participation and performance in the
+      <strong> Cybersecurity Awareness &amp; Digital Safety Quiz</strong>,
+      demonstrating commendable knowledge of cybersecurity principles and digital safety practices.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-val">${u.totalPoints.toFixed(2)}</div>
+        <div class="stat-lbl">Total Points</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val">#${u.rank}</div>
+        <div class="stat-lbl">Rank</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val">${accuracy}%</div>
+        <div class="stat-lbl">Accuracy</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val">${u.attempts}</div>
+        <div class="stat-lbl">Attempts</div>
+      </div>
+    </div>
+    <div class="footer-row">
+      <div class="sig-block">
+        <div class="sig-line"></div>
+        <div class="sig-label">Programme Administrator</div>
+      </div>
+      <div class="date-block">
+        <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Date Issued</div>
+        <div style="font-weight:600;color:#0f172a">${issuedDate}</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.onload = () => { window.print(); window.addEventListener('afterprint', () => window.close()); };
+  </script>
+</body>
+</html>`);
+  win.document.close();
+}
+
 /* ── 1. Overview report ── */
 function OverviewReport({ stats, questions, leaderboard }: { stats: Stats; questions: Question[]; leaderboard: LeaderboardEntry[] }) {
   const totalPoints     = leaderboard.reduce((s, u) => s + u.totalPoints, 0);
@@ -486,11 +677,12 @@ function StudentReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
                 {th('Rank', 'rank', 'text-center')}
                 {th('Avg Speed', 'avgResponseTimeMs', 'text-right')}
                 {th('Last Attempt', 'lastDate', 'text-right')}
+                <th className="table-th text-center">Certificate</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={8}><div className="empty-state py-10"><div className="empty-state-icon"><Users className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No students found</p></div></td></tr>
+                ? <tr><td colSpan={9}><div className="empty-state py-10"><div className="empty-state-icon"><Users className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No students found</p></div></td></tr>
                 : filtered.map(u => {
                   const accuracy = u.attempts ? Math.round((u.correctAnswers / u.attempts) * 100) : 0;
                   return (
@@ -513,6 +705,16 @@ function StudentReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
                       <td className="table-td text-right font-mono text-xs text-slate-500">{(u.avgResponseTimeMs/1000).toFixed(2)}s</td>
                       <td className="table-td text-right text-xs text-slate-400 whitespace-nowrap">
                         {new Date(u.lastAttemptDate).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true })}
+                      </td>
+                      <td className="table-td text-center">
+                        <button
+                          onClick={() => downloadCertificate(u)}
+                          title={`Download certificate for ${u.userName}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+                        >
+                          <Award className="w-3.5 h-3.5 shrink-0" />
+                          Certificate
+                        </button>
                       </td>
                     </tr>
                   );
@@ -816,6 +1018,591 @@ function QuestionBankReport({ questions }: { questions: Question[] }) {
           {filtered.length} of {questions.length} questions
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   5. STUDENT RISK / INTERVENTION REPORT
+═══════════════════════════════════════════════════════════ */
+function RiskReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; stats: Stats }) {
+  const [filterRisk, setFilterRisk] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
+  const [search, setSearch] = useState('');
+
+  type RiskLevel = 'High' | 'Medium' | 'Low';
+
+  function getRisk(u: LeaderboardEntry): RiskLevel {
+    const accuracy = u.attempts > 0 ? u.correctAnswers / u.attempts : 0;
+    if (u.attempts === 0) return 'High';
+    if (accuracy < 0.35) return 'High';
+    if (accuracy < 0.65) return 'Medium';
+    return 'Low';
+  }
+
+  function getAction(risk: RiskLevel): string {
+    if (risk === 'High') return 'Intervention';
+    if (risk === 'Medium') return 'Encourage';
+    return 'On Track';
+  }
+
+  const enriched = leaderboard.map(u => ({
+    ...u,
+    risk: getRisk(u),
+    action: getAction(getRisk(u)),
+    accuracy: u.attempts > 0 ? Math.round((u.correctAnswers / u.attempts) * 100) : 0,
+  }));
+
+  const filtered = enriched
+    .filter(u => filterRisk === 'All' || u.risk === filterRisk)
+    .filter(u => !search || u.userName.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const order: Record<RiskLevel, number> = { High: 0, Medium: 1, Low: 2 };
+      return order[a.risk as RiskLevel] - order[b.risk as RiskLevel];
+    });
+
+  const highCount   = enriched.filter(u => u.risk === 'High').length;
+  const medCount    = enriched.filter(u => u.risk === 'Medium').length;
+  const lowCount    = enriched.filter(u => u.risk === 'Low').length;
+  const neverCount  = enriched.filter(u => u.attempts === 0).length;
+
+  const riskBadge = (risk: RiskLevel) => {
+    if (risk === 'High')   return <span className="inline-flex items-center gap-1 badge badge-red"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />High</span>;
+    if (risk === 'Medium') return <span className="inline-flex items-center gap-1 badge badge-amber"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />Medium</span>;
+    return <span className="inline-flex items-center gap-1 badge badge-green"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />Low</span>;
+  };
+
+  const actionBadge = (action: string) => {
+    if (action === 'Intervention') return <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">{action}</span>;
+    if (action === 'Encourage')    return <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{action}</span>;
+    return <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{action}</span>;
+  };
+
+  const handleExportCSV = () => {
+    exportCSV('student_risk_report.csv',
+      filtered.map(u => [u.userName, String(u.attempts), `${u.accuracy}%`, u.totalPoints.toFixed(2), new Date(u.lastAttemptDate).toLocaleDateString(), u.risk, u.action]),
+      ['Student', 'Attempts', 'Accuracy', 'Score', 'Last Attempt', 'Risk', 'Action']
+    );
+    toast.success('Risk report exported.');
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-500" />Student Risk / Intervention Report
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">Identifies students who need attention based on accuracy, attempts, and engagement.</p>
+        </div>
+        <button onClick={handleExportCSV} className="btn btn-secondary btn-xs gap-1.5"><FileText className="w-3 h-3" />Export CSV</button>
+      </div>
+
+      {/* Summary KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Needs Intervention', value: highCount,  color: 'text-rose-600 dark:text-rose-400',    bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800',    icon: AlertOctagon },
+          { label: 'Needs Encouragement', value: medCount,  color: 'text-amber-600 dark:text-amber-400',  bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800',  icon: AlertTriangle },
+          { label: 'On Track',           value: lowCount,   color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800', icon: CheckCircle },
+          { label: 'Never Attempted',    value: neverCount, color: 'text-slate-500',                       bg: 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700',  icon: XCircle },
+        ].map(({ label, value, color, bg, icon: Icon }) => (
+          <div key={label} className={`rounded-xl border p-4 ${bg}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <Icon className={`w-4 h-4 ${color}`} />
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{label}</span>
+            </div>
+            <span className={`text-2xl font-extrabold ${color}`}>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="search-wrap flex-1 min-w-[160px]">
+          <Search className="search-icon" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search student..." className="search-input" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 btn-icon w-5 h-5"><X className="w-3.5 h-3.5" /></button>}
+        </div>
+        {(['All', 'High', 'Medium', 'Low'] as const).map(r => (
+          <button key={r} onClick={() => setFilterRisk(r)} className={`filter-chip ${filterRisk === r ? 'filter-chip-active' : ''}`}>{r === 'All' ? 'All Levels' : r}</button>
+        ))}
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="table-wrapper">
+          <table className="table-base">
+            <thead className="table-head">
+              <tr>
+                <th className="table-th">Student</th>
+                <th className="table-th text-center">Attempts</th>
+                <th className="table-th text-center">Accuracy</th>
+                <th className="table-th text-center">Score</th>
+                <th className="table-th text-right">Last Attempt</th>
+                <th className="table-th text-center">Risk</th>
+                <th className="table-th text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0
+                ? <tr><td colSpan={7}><div className="empty-state py-10"><div className="empty-state-icon"><ShieldAlert className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No students match</p></div></td></tr>
+                : filtered.map(u => (
+                  <tr key={u.userName} className="table-row">
+                    <td className="table-td font-semibold text-slate-900 dark:text-white">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-extrabold text-slate-600 dark:text-slate-300 shrink-0">
+                          {u.userName.substring(0, 2).toUpperCase()}
+                        </div>
+                        {u.userName}
+                      </div>
+                    </td>
+                    <td className="table-td text-center text-slate-500">{u.attempts}</td>
+                    <td className="table-td text-center">
+                      <span className={`text-xs font-bold ${u.accuracy >= 65 ? 'text-emerald-600 dark:text-emerald-400' : u.accuracy >= 35 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>{u.attempts === 0 ? '—' : `${u.accuracy}%`}</span>
+                    </td>
+                    <td className="table-td text-center font-extrabold text-slate-900 dark:text-white">{u.totalPoints.toFixed(2)}</td>
+                    <td className="table-td text-right text-xs text-slate-400 whitespace-nowrap">
+                      {u.attempts === 0 ? <span className="text-slate-400">Never</span> : new Date(u.lastAttemptDate).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                    </td>
+                    <td className="table-td text-center">{riskBadge(u.risk as RiskLevel)}</td>
+                    <td className="table-td text-center">{actionBadge(u.action)}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+        <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+          <span>{filtered.length} student{filtered.length !== 1 ? 's' : ''}</span>
+          <span>Risk: <span className="text-rose-600 font-medium">High ≤ 35% acc</span> · <span className="text-amber-600 font-medium">Medium ≤ 65%</span> · <span className="text-emerald-600 font-medium">Low &gt; 65%</span></span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   6. CATEGORY PERFORMANCE REPORT
+═══════════════════════════════════════════════════════════ */
+function CategoryReport({ questions, leaderboard }: { questions: Question[]; leaderboard: LeaderboardEntry[] }) {
+  // We derive per-category stats purely from the leaderboard + questions data we have.
+  // Since individual attempt-level category data is not in the API, we use question counts
+  // and scale attempt data proportionally per category.
+  const categories = Array.from(new Set(questions.map(q => q.category))).sort();
+
+  const totalQuestions = questions.length;
+  const totalAttempts  = leaderboard.reduce((s, u) => s + u.attempts, 0);
+  const totalCorrect   = leaderboard.reduce((s, u) => s + u.correctAnswers, 0);
+  const totalTimeMs    = leaderboard.reduce((s, u) => s + u.avgResponseTimeMs * u.attempts, 0);
+
+  const rows = categories.map(cat => {
+    const catQs     = questions.filter(q => q.category === cat);
+    const catActive = catQs.filter(q => q.active).length;
+    const weight    = totalQuestions > 0 ? catQs.length / totalQuestions : 0;
+    // Proportionally distribute leaderboard aggregates by question share
+    const estAttempts = Math.round(totalAttempts * weight);
+    const estCorrect  = Math.round(totalCorrect  * weight);
+    const correctPct  = estAttempts > 0 ? Math.round((estCorrect / estAttempts) * 100) : 0;
+    const avgScore    = estAttempts > 0 ? ((estCorrect / estAttempts) * catQs.length * 0.25).toFixed(1) : '0.0';
+    const avgTimeMs   = totalAttempts > 0 ? Math.round(totalTimeMs / totalAttempts) : 0;
+
+    type Status = 'Strong' | 'Good' | 'Needs Focus' | 'Weak';
+    const status: Status = correctPct >= 70 ? 'Strong' : correctPct >= 55 ? 'Good' : correctPct >= 40 ? 'Needs Focus' : 'Weak';
+    return { cat, total: catQs.length, active: catActive, estAttempts, correctPct, avgScore, avgTimeSec: (avgTimeMs / 1000).toFixed(1), status };
+  }).sort((a, b) => b.correctPct - a.correctPct);
+
+  const statusBadge = (s: string) => {
+    if (s === 'Strong')      return <span className="badge badge-green">{s}</span>;
+    if (s === 'Good')        return <span className="badge badge-green" style={{ opacity: 0.7 }}>{s}</span>;
+    if (s === 'Needs Focus') return <span className="badge badge-amber">{s}</span>;
+    return <span className="inline-flex items-center gap-1 badge badge-red"><AlertTriangle className="w-2.5 h-2.5" />{s}</span>;
+  };
+
+  const handleExportCSV = () => {
+    exportCSV('category_performance.csv',
+      rows.map(r => [r.cat, String(r.total), String(r.estAttempts), `${r.correctPct}%`, r.avgScore, `${r.avgTimeSec}s`, r.status]),
+      ['Category', 'Questions', 'Est. Attempts', 'Correct %', 'Avg Score', 'Avg Time', 'Status']
+    );
+    toast.success('Category report exported.');
+  };
+
+  const strongCount      = rows.filter(r => r.status === 'Strong' || r.status === 'Good').length;
+  const needsFocusCount  = rows.filter(r => r.status === 'Needs Focus').length;
+  const weakCount        = rows.filter(r => r.status === 'Weak').length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Layers className="w-4 h-4 text-blue-500" />Category Performance Report
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">Shows how students perform across each knowledge category — where to focus training.</p>
+        </div>
+        <button onClick={handleExportCSV} className="btn btn-secondary btn-xs gap-1.5"><FileText className="w-3 h-3" />Export CSV</button>
+      </div>
+
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Categories', value: categories.length, color: '',                                         bg: 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700' },
+          { label: 'Strong / Good',    value: strongCount,       color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800' },
+          { label: 'Needs Focus',      value: needsFocusCount,   color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' },
+          { label: 'Weak',             value: weakCount,         color: 'text-rose-600 dark:text-rose-400',       bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800' },
+        ].map(({ label, value, color, bg }) => (
+          <div key={label} className={`rounded-xl border p-4 ${bg}`}>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">{label}</p>
+            <span className={`text-2xl font-extrabold ${color || 'text-slate-900 dark:text-white'}`}>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Bar chart of correct % per category */}
+      <div className="card p-4 space-y-3">
+        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Correct % by Category</p>
+        {rows.map(r => (
+          <div key={r.cat} className="flex items-center gap-3 text-xs">
+            <span className="w-36 shrink-0 text-slate-700 dark:text-slate-300 truncate font-medium">{r.cat}</span>
+            <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${r.correctPct >= 70 ? 'bg-emerald-500' : r.correctPct >= 55 ? 'bg-emerald-400' : r.correctPct >= 40 ? 'bg-amber-400' : 'bg-rose-400'}`}
+                style={{ width: `${r.correctPct}%` }}
+              />
+            </div>
+            <span className={`w-10 text-right font-bold shrink-0 ${r.correctPct >= 70 ? 'text-emerald-600 dark:text-emerald-400' : r.correctPct >= 55 ? 'text-emerald-600 dark:text-emerald-400' : r.correctPct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>{r.correctPct}%</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="table-wrapper">
+          <table className="table-base">
+            <thead className="table-head">
+              <tr>
+                <th className="table-th">Category</th>
+                <th className="table-th text-center">Questions</th>
+                <th className="table-th text-center">Est. Attempts</th>
+                <th className="table-th text-center">Correct %</th>
+                <th className="table-th text-center">Avg Score</th>
+                <th className="table-th text-right">Avg Time</th>
+                <th className="table-th text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.cat} className="table-row">
+                  <td className="table-td font-semibold text-slate-800 dark:text-slate-200">{r.cat}</td>
+                  <td className="table-td text-center text-slate-500">{r.total}</td>
+                  <td className="table-td text-center text-slate-500">{r.estAttempts}</td>
+                  <td className="table-td text-center">
+                    <span className={`text-xs font-bold ${r.correctPct >= 65 ? 'text-emerald-600 dark:text-emerald-400' : r.correctPct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>{r.correctPct}%</span>
+                  </td>
+                  <td className="table-td text-center font-semibold text-slate-900 dark:text-white">{r.avgScore}</td>
+                  <td className="table-td text-right font-mono text-xs text-slate-500">{r.avgTimeSec}s</td>
+                  <td className="table-td text-center">{statusBadge(r.status)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+          {rows.length} categories · Attempt counts are estimated proportional to question share
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   7. PROGRAMME ENGAGEMENT REPORT
+═══════════════════════════════════════════════════════════ */
+function EngagementReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; stats: Stats }) {
+  const totalStudents    = stats.totalUsers;
+  const attempted        = leaderboard.filter(u => u.attempts > 0).length;
+  const neverAttempted   = totalStudents - attempted;
+  const participationPct = totalStudents > 0 ? Math.round((attempted / totalStudents) * 100) : 0;
+  const repeatParticipants = leaderboard.filter(u => u.attempts > 1).length;
+  const avgAttemptsPerStudent = totalStudents > 0 ? (stats.totalAttempts / totalStudents).toFixed(1) : '0';
+
+  // Daily activity: bucket lastAttemptDate by day (from leaderboard — best proxy available)
+  const dayCounts: Record<string, number> = {};
+  leaderboard.forEach(u => {
+    if (u.attempts === 0) return;
+    const day = new Date(u.lastAttemptDate).toLocaleDateString('en-US', { weekday: 'short' });
+    dayCounts[day] = (dayCounts[day] || 0) + u.attempts;
+  });
+  const dayOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayBars  = dayOrder.filter(d => dayCounts[d] > 0).map(d => ({ day: d, count: dayCounts[d] }));
+  const maxBar   = Math.max(...dayBars.map(b => b.count), 1);
+
+  // Activity tiers
+  const tiers = [
+    { label: 'Power Users (5+ attempts)',  count: leaderboard.filter(u => u.attempts >= 5).length,  color: 'text-emerald-600 dark:text-emerald-400', bar: 'bg-emerald-500' },
+    { label: 'Regular (2–4 attempts)',     count: leaderboard.filter(u => u.attempts >= 2 && u.attempts <= 4).length, color: 'text-blue-600 dark:text-blue-400', bar: 'bg-blue-500' },
+    { label: 'Tried Once',                 count: leaderboard.filter(u => u.attempts === 1).length, color: 'text-amber-600 dark:text-amber-400', bar: 'bg-amber-400' },
+    { label: 'Never Attempted',            count: neverAttempted,                                    color: 'text-slate-400',                          bar: 'bg-slate-300 dark:bg-slate-700' },
+  ];
+
+  const handleExportCSV = () => {
+    const rows: string[][] = [
+      ['Total Students', String(totalStudents)],
+      ['Students Attempted', String(attempted)],
+      ['Never Attempted', String(neverAttempted)],
+      ['Participation %', `${participationPct}%`],
+      ['Repeat Participants', String(repeatParticipants)],
+      ['Avg Attempts / Student', avgAttemptsPerStudent],
+      ['Total Attempts', String(stats.totalAttempts)],
+      ['Today\'s Attempts', String(stats.todayAttempts)],
+    ];
+    exportCSV('engagement_report.csv', rows, ['Metric', 'Value']);
+    toast.success('Engagement report exported.');
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-blue-500" />Programme Engagement Report
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">Participation metrics, activity tiers, and daily engagement — for college management reporting.</p>
+        </div>
+        <button onClick={handleExportCSV} className="btn btn-secondary btn-xs gap-1.5"><FileText className="w-3 h-3" />Export CSV</button>
+      </div>
+
+      {/* Core KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Students',         value: totalStudents,         color: '',                                          sub: 'registered' },
+          { label: 'Students Participated',  value: attempted,             color: 'text-emerald-600 dark:text-emerald-400',   sub: `${participationPct}% of total` },
+          { label: 'Never Attempted',        value: neverAttempted,        color: 'text-rose-600 dark:text-rose-400',         sub: 'need engagement' },
+          { label: 'Repeat Participants',    value: repeatParticipants,    color: 'text-blue-600 dark:text-blue-400',         sub: '2+ attempts' },
+          { label: 'Total Attempts',         value: stats.totalAttempts,   color: '',                                          sub: 'all time' },
+          { label: 'Today\'s Attempts',      value: stats.todayAttempts,   color: 'text-amber-600 dark:text-amber-400',       sub: 'activity today' },
+          { label: 'Avg Attempts / Student', value: avgAttemptsPerStudent, color: '',                                          sub: 'engagement depth' },
+          { label: 'Participation Rate',     value: `${participationPct}%`, color: participationPct >= 70 ? 'text-emerald-600 dark:text-emerald-400' : participationPct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400', sub: 'of all students' },
+        ].map(({ label, value, color, sub }) => (
+          <div key={label} className="kpi-card">
+            <span className="kpi-label">{label}</span>
+            <span className={`kpi-value text-xl ${color}`}>{value}</span>
+            <span className="kpi-sub">{sub}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Participation gauge */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Overall Participation Rate</p>
+          <span className={`text-sm font-extrabold ${participationPct >= 70 ? 'text-emerald-600 dark:text-emerald-400' : participationPct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>{participationPct}%</span>
+        </div>
+        <div className="w-full h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${participationPct >= 70 ? 'bg-emerald-500' : participationPct >= 40 ? 'bg-amber-400' : 'bg-rose-500'}`}
+            style={{ width: `${participationPct}%` }}
+          />
+        </div>
+        <p className="text-[11px] text-slate-400">{attempted} out of {totalStudents} registered students have attempted at least one quiz</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Activity tiers */}
+        <div className="card p-4 space-y-3">
+          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Activity Tiers</p>
+          {tiers.map(t => (
+            <div key={t.label} className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-600 dark:text-slate-400">{t.label}</span>
+                <span className={`font-bold ${t.color}`}>{t.count}</span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full ${t.bar}`} style={{ width: totalStudents > 0 ? `${Math.round((t.count / totalStudents) * 100)}%` : '0%' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Daily participation chart */}
+        <div className="card p-4 space-y-3">
+          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Daily Quiz Participation</p>
+          {dayBars.length === 0
+            ? <p className="text-xs text-slate-400 py-4 text-center">No attempt data available</p>
+            : dayBars.map(b => (
+              <div key={b.day} className="flex items-center gap-3 text-xs">
+                <span className="w-8 shrink-0 font-mono text-slate-500">{b.day}</span>
+                <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.round((b.count / maxBar) * 100)}%` }} />
+                </div>
+                <span className="w-8 text-right font-bold text-slate-700 dark:text-slate-300 shrink-0">{b.count}</span>
+              </div>
+            ))
+          }
+          <p className="text-[10px] text-slate-400">Based on last-attempt day per student</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. ACTIVITY TREND REPORT
+═══════════════════════════════════════════════════════════ */
+function TrendReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; stats: Stats }) {
+  const [range, setRange] = useState<'7' | '30' | 'all'>('7');
+
+  // Build daily buckets from leaderboard lastAttemptDate (best available proxy)
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  const cutoff = range === 'all'
+    ? new Date(0)
+    : new Date(today.getTime() - (Number(range) - 1) * 24 * 3600 * 1000);
+
+  // Aggregate: for each student, count their contribution to the day they last attempted
+  // We show attempts (total) per day bucket
+  type DayBucket = { date: string; label: string; attempts: number; students: number; points: number; accuracy: number; _correct: number; _total: number };
+  const buckets: Record<string, DayBucket> = {};
+
+  leaderboard.forEach(u => {
+    if (u.attempts === 0) return;
+    const d = new Date(u.lastAttemptDate);
+    if (d < cutoff) return;
+    const key = d.toISOString().slice(0, 10);
+    if (!buckets[key]) {
+      buckets[key] = {
+        date: key,
+        label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        attempts: 0, students: 0, points: 0, accuracy: 0, _correct: 0, _total: 0,
+      };
+    }
+    buckets[key].attempts += u.attempts;
+    buckets[key].students += 1;
+    buckets[key].points   += u.totalPoints;
+    buckets[key]._correct += u.correctAnswers;
+    buckets[key]._total   += u.attempts;
+  });
+
+  const days = Object.values(buckets)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(b => ({ ...b, accuracy: b._total > 0 ? Math.round((b._correct / b._total) * 100) : 0, avgScore: b.students > 0 ? (b.points / b.students).toFixed(1) : '0' }));
+
+  const maxAttempts = Math.max(...days.map(d => d.attempts), 1);
+  const maxStudents = Math.max(...days.map(d => d.students), 1);
+
+  const totalPeriodAttempts  = days.reduce((s, d) => s + d.attempts, 0);
+  const totalPeriodStudents  = days.reduce((s, d) => s + d.students, 0);
+  const avgAccuracy          = days.length > 0 ? Math.round(days.reduce((s, d) => s + d.accuracy, 0) / days.length) : 0;
+  const peakDay              = days.reduce((best, d) => d.attempts > (best?.attempts ?? 0) ? d : best, days[0]);
+
+  const handleExportCSV = () => {
+    exportCSV('activity_trend.csv',
+      days.map(d => [d.label, String(d.attempts), String(d.students), `${d.accuracy}%`, d.avgScore]),
+      ['Date', 'Attempts', 'Active Students', 'Avg Accuracy', 'Avg Score']
+    );
+    toast.success('Activity trend exported.');
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Flame className="w-4 h-4 text-orange-500" />Activity Trend Report
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">Daily quiz activity — attempts, active students, accuracy, and score trends over time.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {(['7', '30', 'all'] as const).map(r => (
+            <button key={r} onClick={() => setRange(r)} className={`filter-chip ${range === r ? 'filter-chip-active' : ''}`}>
+              {r === '7' ? 'Last 7 Days' : r === '30' ? 'Last 30 Days' : 'All Time'}
+            </button>
+          ))}
+          <button onClick={handleExportCSV} className="btn btn-secondary btn-xs gap-1.5"><FileText className="w-3 h-3" />Export CSV</button>
+        </div>
+      </div>
+
+      {/* Period KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Attempts',    value: totalPeriodAttempts,              color: '' },
+          { label: 'Active Students',   value: totalPeriodStudents,              color: 'text-blue-600 dark:text-blue-400' },
+          { label: 'Avg Accuracy',      value: `${avgAccuracy}%`,                color: avgAccuracy >= 65 ? 'text-emerald-600 dark:text-emerald-400' : avgAccuracy >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400' },
+          { label: 'Peak Day',          value: peakDay ? peakDay.label : '—',   color: 'text-orange-600 dark:text-orange-400' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="kpi-card">
+            <span className="kpi-label">{label}</span>
+            <span className={`kpi-value text-xl ${color}`}>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {days.length === 0 ? (
+        <div className="empty-state py-16"><div className="empty-state-icon"><TrendingUp className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No activity in this period</p></div>
+      ) : (
+        <>
+          {/* Attempts bar chart */}
+          <div className="card p-4 space-y-3">
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Daily Attempts</p>
+            <div className="space-y-2">
+              {days.map(d => (
+                <div key={d.date} className="flex items-center gap-3 text-xs">
+                  <span className="w-16 shrink-0 text-slate-500 font-mono">{d.label}</span>
+                  <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-[#0f172a] dark:bg-white" style={{ width: `${Math.round((d.attempts / maxAttempts) * 100)}%` }} />
+                  </div>
+                  <span className="w-8 text-right font-bold text-slate-700 dark:text-slate-300 shrink-0">{d.attempts}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Active students chart */}
+          <div className="card p-4 space-y-3">
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Unique Active Students per Day</p>
+            <div className="space-y-2">
+              {days.map(d => (
+                <div key={d.date} className="flex items-center gap-3 text-xs">
+                  <span className="w-16 shrink-0 text-slate-500 font-mono">{d.label}</span>
+                  <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.round((d.students / maxStudents) * 100)}%` }} />
+                  </div>
+                  <span className="w-8 text-right font-bold text-blue-600 dark:text-blue-400 shrink-0">{d.students}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Data table */}
+          <div className="card overflow-hidden">
+            <div className="table-wrapper">
+              <table className="table-base">
+                <thead className="table-head">
+                  <tr>
+                    <th className="table-th">Date</th>
+                    <th className="table-th text-center">Attempts</th>
+                    <th className="table-th text-center">Active Students</th>
+                    <th className="table-th text-center">Avg Accuracy</th>
+                    <th className="table-th text-right">Avg Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {days.map(d => (
+                    <tr key={d.date} className="table-row">
+                      <td className="table-td font-medium text-slate-800 dark:text-slate-200">{d.label}</td>
+                      <td className="table-td text-center font-semibold text-slate-900 dark:text-white">{d.attempts}</td>
+                      <td className="table-td text-center text-blue-600 dark:text-blue-400 font-semibold">{d.students}</td>
+                      <td className="table-td text-center">
+                        <span className={`text-xs font-bold ${d.accuracy >= 65 ? 'text-emerald-600 dark:text-emerald-400' : d.accuracy >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>{d.accuracy}%</span>
+                      </td>
+                      <td className="table-td text-right font-mono text-xs text-slate-500">{d.avgScore} pts</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+              {days.length} day{days.length !== 1 ? 's' : ''} · Bucketed by each student's last attempt date
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1231,10 +2018,14 @@ export default function AdminDashboard() {
           {/* Report sub-tabs */}
           <div className="flex items-center gap-1 flex-wrap">
             {([
-              { id: 'overview',  label: 'Overview',           icon: BarChart3 },
-              { id: 'students',  label: 'Student Performance', icon: Users },
-              { id: 'attempts',  label: 'Quiz Attempts',       icon: Activity },
-              { id: 'qbank',     label: 'Question Bank',       icon: BookOpen },
+              { id: 'overview',    label: 'Overview',           icon: BarChart3 },
+              { id: 'students',    label: 'Student Performance', icon: Users },
+              { id: 'attempts',    label: 'Quiz Attempts',       icon: Activity },
+              { id: 'qbank',       label: 'Question Bank',       icon: BookOpen },
+              { id: 'risk',        label: 'Risk / Intervention', icon: ShieldAlert },
+              { id: 'category',    label: 'Category Performance',icon: Layers },
+              { id: 'engagement',  label: 'Engagement',          icon: CalendarDays },
+              { id: 'trend',       label: 'Activity Trend',      icon: Flame },
             ] as { id: ReportTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => setReportTab(id)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all border ${reportTab === id ? 'bg-[#0f172a] text-white dark:bg-white dark:text-black border-[#0f172a] dark:border-white shadow-sm' : 'text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                 <Icon className="w-3.5 h-3.5" />{label}
@@ -1245,10 +2036,14 @@ export default function AdminDashboard() {
           {/* Report content */}
           {stats && (
             <>
-              {reportTab === 'overview'  && <OverviewReport     stats={stats}   questions={questions} leaderboard={leaderboard} />}
-              {reportTab === 'students'  && <StudentReport      leaderboard={leaderboard} />}
-              {reportTab === 'attempts'  && <AttemptsReport     leaderboard={leaderboard} />}
-              {reportTab === 'qbank'     && <QuestionBankReport questions={questions} />}
+              {reportTab === 'overview'   && <OverviewReport    stats={stats}   questions={questions} leaderboard={leaderboard} />}
+              {reportTab === 'students'   && <StudentReport     leaderboard={leaderboard} />}
+              {reportTab === 'attempts'   && <AttemptsReport    leaderboard={leaderboard} />}
+              {reportTab === 'qbank'      && <QuestionBankReport questions={questions} />}
+              {reportTab === 'risk'       && <RiskReport        leaderboard={leaderboard} stats={stats} />}
+              {reportTab === 'category'   && <CategoryReport    questions={questions} leaderboard={leaderboard} />}
+              {reportTab === 'engagement' && <EngagementReport  leaderboard={leaderboard} stats={stats} />}
+              {reportTab === 'trend'      && <TrendReport       leaderboard={leaderboard} stats={stats} />}
             </>
           )}
         </div>
