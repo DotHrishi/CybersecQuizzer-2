@@ -35,10 +35,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma local db
-/prisma/*.db
+# prisma local db journal
 /prisma/*.db-journal
+!prisma/dev.db
 
 .vercel
 scratch/
-.vercel

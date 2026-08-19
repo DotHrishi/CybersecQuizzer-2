@@ -381,8 +381,14 @@ export const dataService = {
 
       return dummy;
     } catch (dbErr) {
-      console.error('Prisma getOrCreateDummyCollege failed:', dbErr);
-      throw dbErr;
+      console.warn('Prisma getOrCreateDummyCollege fallback used:', dbErr);
+      return {
+        id: 1,
+        name: DUMMY_COLLEGE_NAME,
+        identifier: DUMMY_COLLEGE_IDENTIFIER,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
     }
   },
 
