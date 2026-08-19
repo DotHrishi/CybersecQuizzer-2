@@ -317,8 +317,14 @@ export default function SuperAdminDashboard() {
   });
 
   const totalAdmins = admins.length;
+  const uniqueSchools = new Set(
+    admins
+      .map(a => a.name?.trim().toLowerCase())
+      .filter((name): name is string => Boolean(name && name.length > 0))
+  ).size;
   const activeAdmins = admins.filter(a => a.active).length;
   const disabledAdmins = totalAdmins - activeAdmins;
+
 
   /* ── Top Header Component for SuperAdmin Portal ── */
   const SuperAdminHeader = () => (
@@ -519,12 +525,23 @@ export default function SuperAdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="card p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Schools &amp; Admins</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Admins</p>
               <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{totalAdmins}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Configured in database</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Admin accounts created</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
               <Users className="w-6 h-6 text-slate-700 dark:text-slate-300" />
+            </div>
+          </div>
+
+          <div className="card p-5 flex items-center justify-between border-indigo-200/60 dark:border-indigo-900/40">
+            <div>
+              <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Total Schools</p>
+              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{uniqueSchools}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Unique participating schools</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
 
@@ -532,24 +549,14 @@ export default function SuperAdminDashboard() {
             <div>
               <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Active Admins</p>
               <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{activeAdmins}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Can login to /admin</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">{disabledAdmins > 0 ? `${disabledAdmins} disabled` : 'All accounts active'}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
               <UserCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
-
-          <div className="card p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Disabled Admins</p>
-              <p className="text-2xl font-black text-slate-600 dark:text-slate-400 mt-1">{disabledAdmins}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Access suspended</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-              <UserX className="w-6 h-6 text-slate-500" />
-            </div>
-          </div>
         </div>
+
 
         {/* Admin List Table Card */}
         <div className="card overflow-hidden">
