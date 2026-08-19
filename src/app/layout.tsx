@@ -24,6 +24,9 @@ export default function RootLayout({
         <ThemeProvider>
           <Toaster
             position="top-right"
+            containerStyle={{
+              zIndex: 999999,
+            }}
             toastOptions={{
               duration: 4000,
               style: {
@@ -33,7 +36,8 @@ export default function RootLayout({
                 border: '1px solid #334155',
                 fontSize: '12px',
                 fontWeight: '600',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.3)',
+                zIndex: 999999,
               },
             }}
           />
