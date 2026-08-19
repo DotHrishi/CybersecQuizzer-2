@@ -50,6 +50,15 @@ export async function POST(req: NextRequest) {
     }
     const cleanIdentifier = rawIdentifier.toLowerCase();
 
+    // Validate School Name (compulsory)
+    const schoolName = typeof name === 'string' ? name.trim() : '';
+    if (!schoolName) {
+      return NextResponse.json(
+        { success: false, message: 'School Name is required.' },
+        { status: 400 }
+      );
+    }
+
     // Validate password
     if (!password || typeof password !== 'string' || password.length < 6) {
       return NextResponse.json(
@@ -57,6 +66,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
 
     // Check if username/email already registered
     const existing = await dataService.getAdminByEmail(cleanIdentifier);

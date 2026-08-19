@@ -7,7 +7,7 @@ import {
   CheckCircle2, XCircle, Search, RefreshCw, Eye, EyeOff,
   UserCheck, UserX, Copy, Check, LogOut, ArrowLeft,
   Sparkles, Users, AlertTriangle, X, Loader2, Sun, Moon,
-  User
+  User, Building2
 } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import toast from 'react-hot-toast';
@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 interface AdminAccount {
   id: number;
   email: string; // Used as the unique username/identifier
-  name: string | null;
+  name: string | null; // Used as the school name
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -51,7 +51,7 @@ export default function SuperAdminDashboard() {
   /* Modals */
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
-  const [newName, setNewName] = useState('');
+  const [newSchoolName, setNewSchoolName] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newActive, setNewActive] = useState(true);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -167,6 +167,10 @@ export default function SuperAdminDashboard() {
       toast.error('Admin username is required.');
       return;
     }
+    if (!newSchoolName.trim()) {
+      toast.error('School name is required.');
+      return;
+    }
     if (!newPassword.trim() || newPassword.length < 6) {
       toast.error('Password must be at least 6 characters.');
       return;
@@ -182,7 +186,7 @@ export default function SuperAdminDashboard() {
         },
         body: JSON.stringify({
           username: newUsername.trim(),
-          name: newName.trim() || undefined,
+          name: newSchoolName.trim(),
           password: newPassword,
           active: newActive,
         }),
@@ -190,10 +194,10 @@ export default function SuperAdminDashboard() {
 
       const data = await res.json();
       if (data.success) {
-        toast.success(`Admin account "${newUsername}" created successfully!`);
+        toast.success(`Admin account "${newUsername}" created for ${newSchoolName}!`);
         setAddModalOpen(false);
         setNewUsername('');
-        setNewName('');
+        setNewSchoolName('');
         setNewPassword('');
         setNewActive(true);
         fetchAdmins();
@@ -408,7 +412,7 @@ export default function SuperAdminDashboard() {
                 Super Admin Gateway
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                Enter your master password to create and manage username &amp; password credentials for quiz administrators.
+                Enter your master password to create and manage school admin credentials.
               </p>
             </div>
 
@@ -494,7 +498,7 @@ export default function SuperAdminDashboard() {
               Admin Credential Management
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Provision usernames and passwords for normal administrators who manage questions and access reports at <span className="font-semibold text-slate-700 dark:text-slate-300">/admin</span>.
+              Provision usernames, school names, and passwords for administrators who manage questions and access reports at <span className="font-semibold text-slate-700 dark:text-slate-300">/admin</span>.
             </p>
           </div>
 
@@ -502,10 +506,11 @@ export default function SuperAdminDashboard() {
             <button
               onClick={() => {
                 setNewUsername('');
-                setNewName('');
-                setNewPassword(generateStrongPassword());
+                setNewSchoolName('');
+                setNewPassword(''); // Keep blank initially
                 setNewActive(true);
                 setCopiedNewCreds(false);
+                setShowNewPassword(false);
                 setAddModalOpen(true);
               }}
               className="btn btn-primary btn-md gap-2 shadow-sm"
@@ -520,7 +525,7 @@ export default function SuperAdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="card p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Admins</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Schools &amp; Admins</p>
               <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{totalAdmins}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Configured in database</p>
             </div>
@@ -570,7 +575,7 @@ export default function SuperAdminDashboard() {
                   type="text"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Search username or name..."
+                  placeholder="Search username or school name..."
                   className="field-input pl-8 py-1.5 text-xs w-full"
                 />
                 {searchTerm && (
@@ -609,7 +614,7 @@ export default function SuperAdminDashboard() {
               <thead className="table-head">
                 <tr>
                   <th className="table-th">Admin Username</th>
-                  <th className="table-th">Name / Label</th>
+                  <th className="table-th">School Name</th>
                   <th className="table-th text-center">Status</th>
                   <th className="table-th">Created Date</th>
                   <th className="table-th text-right">Actions</th>
@@ -637,7 +642,7 @@ export default function SuperAdminDashboard() {
                           {searchTerm ? 'No admins matching filter.' : 'No admin credentials registered yet.'}
                         </p>
                         <p className="text-xs text-slate-400 leading-relaxed">
-                          Click &quot;Add New Admin&quot; to provision username and password credentials for your quiz question administrators.
+                          Click &quot;Add New Admin&quot; to provision username, school name, and password for school quiz administrators.
                         </p>
                       </div>
                     </td>
@@ -654,8 +659,11 @@ export default function SuperAdminDashboard() {
                         </div>
                       </td>
 
-                      <td className="table-td text-slate-600 dark:text-slate-400">
-                        {admin.name || <span className="text-slate-400 italic">Not set</span>}
+                      <td className="table-td text-slate-800 dark:text-slate-200 font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{admin.name || <span className="text-slate-400 italic">Not set</span>}</span>
+                        </div>
                       </td>
 
                       <td className="table-td text-center">
@@ -691,8 +699,8 @@ export default function SuperAdminDashboard() {
                           <button
                             onClick={() => {
                               setResetModalAdmin(admin);
-                              setResetPassword(generateStrongPassword());
-                              setShowResetPassword(true);
+                              setResetPassword('');
+                              setShowResetPassword(false);
                             }}
                             title="Reset Password"
                             className="btn-icon text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
@@ -744,7 +752,7 @@ export default function SuperAdminDashboard() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add New Admin Account</h3>
-                    <p className="text-[11px] text-slate-500">Create login credentials for a quiz administrator</p>
+                    <p className="text-[11px] text-slate-500">All fields are compulsory</p>
                   </div>
                 </div>
                 <button onClick={() => setAddModalOpen(false)} className="btn-icon">
@@ -759,7 +767,7 @@ export default function SuperAdminDashboard() {
                     type="text"
                     value={newUsername}
                     onChange={e => setNewUsername(e.target.value)}
-                    placeholder="e.g. cyberadmin1 or teacher_alex"
+                    placeholder="e.g. cyberadmin1 or st_xaviers_admin"
                     className="field-input"
                     required
                     autoFocus
@@ -767,13 +775,14 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="field-label">Name / Label (Optional)</label>
+                  <label className="field-label">School Name <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    placeholder="e.g. Security Lead - Alex"
+                    value={newSchoolName}
+                    onChange={e => setNewSchoolName(e.target.value)}
+                    placeholder="e.g. St. Xavier's High School"
                     className="field-input"
+                    required
                   />
                 </div>
 
@@ -798,7 +807,7 @@ export default function SuperAdminDashboard() {
                       type={showNewPassword ? 'text' : 'password'}
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Enter or generate password..."
+                      placeholder="Enter password (min. 6 characters)..."
                       className="field-input pr-10 font-mono text-xs"
                       required
                     />
@@ -812,7 +821,7 @@ export default function SuperAdminDashboard() {
                     </button>
                   </div>
 
-                  {newPassword && (
+                  {newPassword.trim() && (
                     <div className="mt-2 flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
                       <span className="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate max-w-[280px]">
                         {newUsername || 'username'} : {newPassword}
@@ -820,7 +829,7 @@ export default function SuperAdminDashboard() {
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(`Username: ${newUsername || 'N/A'}\nPassword: ${newPassword}`);
+                          navigator.clipboard.writeText(`School: ${newSchoolName || 'N/A'}\nUsername: ${newUsername || 'N/A'}\nPassword: ${newPassword}`);
                           setCopiedNewCreds(true);
                           toast.success('Credentials copied to clipboard!');
                           setTimeout(() => setCopiedNewCreds(false), 2500);
@@ -857,7 +866,7 @@ export default function SuperAdminDashboard() {
                     </button>
                     <button
                       type="submit"
-                      disabled={isSavingAdmin || !newUsername.trim() || !newPassword.trim()}
+                      disabled={isSavingAdmin || !newUsername.trim() || !newSchoolName.trim() || !newPassword.trim()}
                       className="btn btn-primary btn-sm gap-1.5"
                     >
                       {isSavingAdmin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
@@ -890,6 +899,9 @@ export default function SuperAdminDashboard() {
                 <div>
                   <p className="text-xs text-slate-500">Admin Username</p>
                   <p className="text-sm font-bold text-slate-900 dark:text-white font-mono mt-0.5">{resetModalAdmin.email}</p>
+                  {resetModalAdmin.name && (
+                    <p className="text-xs text-slate-400 mt-0.5">School: {resetModalAdmin.name}</p>
+                  )}
                 </div>
 
                 <div>
@@ -913,7 +925,7 @@ export default function SuperAdminDashboard() {
                       type={showResetPassword ? 'text' : 'password'}
                       value={resetPassword}
                       onChange={e => setResetPassword(e.target.value)}
-                      placeholder="Enter new password..."
+                      placeholder="Enter new password (min. 6 characters)..."
                       className="field-input pr-10 font-mono text-xs"
                       required
                       autoFocus
@@ -968,7 +980,7 @@ export default function SuperAdminDashboard() {
                     Delete Admin Account?
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Are you sure you want to permanently delete admin account <span className="font-semibold font-mono text-slate-800 dark:text-slate-200">{deleteModalAdmin.email}</span>?
+                    Are you sure you want to permanently delete admin account <span className="font-semibold font-mono text-slate-800 dark:text-slate-200">{deleteModalAdmin.email}</span> ({deleteModalAdmin.name})?
                     They will lose access to the question bank and reporting tools.
                   </p>
                 </div>
