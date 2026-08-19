@@ -43,8 +43,14 @@ export default function Navbar() {
 
   const allNavLinks = [...leftNavLinks, ...rightNavLinks];
 
+  // Completely hide the default Navbar on /superadmin
+  if (pathname?.startsWith('/superadmin')) {
+    return null;
+  }
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm">
+
       <div className="container mx-auto px-4 max-w-7xl">
 
         {/* ── Main bar ── */}

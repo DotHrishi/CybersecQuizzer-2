@@ -122,14 +122,14 @@ function LoginScreen({ onLogin, isLoading }: { onLogin: (email: string, pwd: str
         className="space-y-4 text-left"
       >
         <div>
-          <label className="field-label">Admin Username / Email</label>
+          <label className="field-label">Admin Username</label>
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={identifier}
               onChange={e => setIdentifier(e.target.value)}
-              placeholder="e.g. admin or admin@school.edu"
+              placeholder="e.g. admin"
               autoFocus
               className="field-input pl-9"
               required
@@ -145,7 +145,7 @@ function LoginScreen({ onLogin, isLoading }: { onLogin: (email: string, pwd: str
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="Enter your admin password..."
+              placeholder="Enter admin password..."
               className="field-input pl-9 pr-10"
               required
             />
@@ -173,7 +173,7 @@ function LoginScreen({ onLogin, isLoading }: { onLogin: (email: string, pwd: str
         </button>
 
         {/* Super Admin Login Button */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 text-center">
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 text-center space-y-2">
           <Link
             href="/superadmin"
             className="btn btn-secondary btn-sm w-full justify-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
@@ -181,10 +181,11 @@ function LoginScreen({ onLogin, isLoading }: { onLogin: (email: string, pwd: str
             <Key className="w-3.5 h-3.5 text-amber-500" />
             <span>Login as Super Admin</span>
           </Link>
-          <p className="text-[11px] text-slate-400 mt-1.5">
-            Super admin can create &amp; manage credentials for normal admins
+          <p className="text-[11px] text-slate-400">
+            Super admin can provision &amp; manage credentials for normal admins
           </p>
         </div>
+
       </form>
     </div>
   );

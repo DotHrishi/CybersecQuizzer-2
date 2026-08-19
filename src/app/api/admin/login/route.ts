@@ -62,15 +62,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Legacy / Fallback mode support (e.g. if logging in with 'admin' or 'admin@school.edu' with env password)
+    // 2. Default/Legacy mode: username 'admin' with password 'cyberadmin123' (or env ADMIN_PASSWORD)
     if (
       (cleanIdentifier === 'admin' || cleanIdentifier === 'admin@system' || cleanIdentifier === 'admin@school.edu') &&
-      password.trim() === LEGACY_ADMIN_PASSWORD
+      (password.trim() === 'cyberadmin123' || password.trim() === LEGACY_ADMIN_PASSWORD)
     ) {
       const token = signAdminToken({
         id: -1,
-        email: 'admin@system',
-        name: 'Master Admin',
+        email: 'admin',
+        name: 'Administrator',
       });
 
       return NextResponse.json({
@@ -78,12 +78,13 @@ export async function POST(req: NextRequest) {
         token,
         admin: {
           id: -1,
-          email: 'admin@system',
-          name: 'Master Admin',
+          email: 'admin',
+          name: 'Administrator',
         },
         message: 'Admin authenticated successfully.',
       });
     }
+
 
     return NextResponse.json(
       { success: false, message: 'Invalid email or password.' },
