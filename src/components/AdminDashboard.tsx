@@ -173,7 +173,7 @@ function LoginScreen({ onLogin, isLoading }: { onLogin: (email: string, pwd: str
         </button>
 
         {/* Super Admin Login Button */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 text-center space-y-2">
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 text-center">
           <Link
             href="/superadmin"
             className="btn btn-secondary btn-sm w-full justify-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
@@ -181,10 +181,8 @@ function LoginScreen({ onLogin, isLoading }: { onLogin: (email: string, pwd: str
             <Key className="w-3.5 h-3.5 text-amber-500" />
             <span>Login as Super Admin</span>
           </Link>
-          <p className="text-[11px] text-slate-400">
-            Super admin can provision &amp; manage credentials for normal admins
-          </p>
         </div>
+
 
       </form>
     </div>

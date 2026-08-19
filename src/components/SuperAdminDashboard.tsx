@@ -487,20 +487,14 @@ export default function SuperAdminDashboard() {
         {/* Top Banner & Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                SUPER ADMIN
-              </span>
-              <span className="text-xs text-slate-400">/superadmin</span>
-            </div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
               Admin Credential Management
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Provision usernames, school names, and passwords for administrators who manage questions and access reports at <span className="font-semibold text-slate-700 dark:text-slate-300">/admin</span>.
             </p>
           </div>
+
 
           <div className="flex items-center gap-2 shrink-0">
             <button
