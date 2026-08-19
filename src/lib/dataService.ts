@@ -1,5 +1,12 @@
 import { db } from './db';
 import { supabase } from './supabase';
+import {
+  isCollegeNameMatch,
+  normalizeCollegeName,
+  DUMMY_COLLEGE_NAME,
+  DUMMY_COLLEGE_IDENTIFIER,
+} from './collegeNormalization';
+
 
 const isSupabaseConfigured = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -351,25 +358,159 @@ export const dataService = {
     }
   },
 
-  async getUserProfile(nickname: string) {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('nickname', nickname)
-          .maybeSingle();
+  /* ─── College Management ────────────────────────────────── */
+  async getOrCreateDummyCollege() {
+    try {
+      let dummy = await db.college.findFirst({
+        where: {
+          OR: [
+            { identifier: DUMMY_COLLEGE_IDENTIFIER },
+            { name: DUMMY_COLLEGE_NAME },
+          ],
+        },
+      });
 
-        if (!error) return data;
-        console.error('Supabase getUserProfile error:', error);
-      } catch (err) {
-        console.warn('Supabase getUserProfile failed:', err);
+      if (!dummy) {
+        dummy = await db.college.create({
+          data: {
+            name: DUMMY_COLLEGE_NAME,
+            identifier: DUMMY_COLLEGE_IDENTIFIER,
+          },
+        });
       }
+
+      return dummy;
+    } catch (dbErr) {
+      console.error('Prisma getOrCreateDummyCollege failed:', dbErr);
+      throw dbErr;
     }
+  },
+
+  async getAllColleges() {
+    try {
+      const colleges = await db.college.findMany({
+        include: {
+          _count: {
+            select: {
+              students: true,
+              admins: true,
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      return colleges.map(c => ({
+        id: c.id,
+        name: c.name,
+        identifier: c.identifier,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        studentCount: c._count.students,
+        adminCount: c._count.admins,
+      }));
+    } catch (dbErr) {
+      console.error('Prisma getAllColleges fallback failed:', dbErr);
+      return [];
+    }
+  },
+
+  async getCollegeById(id: number) {
+    try {
+      return await db.college.findUnique({
+        where: { id },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getCollegeById failed:', dbErr);
+      return null;
+    }
+  },
+
+  async getCollegeByIdentifier(identifier: string) {
+    const clean = identifier.trim().toUpperCase();
+    try {
+      return await db.college.findUnique({
+        where: { identifier: clean },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getCollegeByIdentifier failed:', dbErr);
+      return null;
+    }
+  },
+
+  async findCollegeByName(name: string) {
+    const norm = normalizeCollegeName(name);
+    if (!norm) return null;
 
     try {
+      // First try exact case match or lowercase match
+      const allColleges = await db.college.findMany();
+      const match = allColleges.find(c => isCollegeNameMatch(norm, c.name));
+      return match || null;
+    } catch (dbErr) {
+      console.error('Prisma findCollegeByName failed:', dbErr);
+      return null;
+    }
+  },
+
+  async createCollege(data: { name: string; identifier: string }) {
+    const normName = normalizeCollegeName(data.name);
+    const cleanIdentifier = data.identifier.trim().toUpperCase();
+
+    try {
+      return await db.college.create({
+        data: {
+          name: normName,
+          identifier: cleanIdentifier,
+        },
+      });
+    } catch (dbErr) {
+      console.error('Prisma createCollege failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  async updateCollege(id: number, data: { name?: string; identifier?: string }) {
+    const payload: any = { updatedAt: new Date() };
+    if (data.name !== undefined) payload.name = normalizeCollegeName(data.name);
+    if (data.identifier !== undefined) payload.identifier = data.identifier.trim().toUpperCase();
+
+    try {
+      return await db.college.update({
+        where: { id },
+        data: payload,
+      });
+    } catch (dbErr) {
+      console.error('Prisma updateCollege failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  async deleteCollege(id: number) {
+    try {
+      // Check if dummy college
+      const college = await db.college.findUnique({ where: { id } });
+      if (college && (college.identifier === DUMMY_COLLEGE_IDENTIFIER || college.name === DUMMY_COLLEGE_NAME)) {
+        throw new Error('System placeholder dummy college cannot be deleted.');
+      }
+
+      await db.college.delete({ where: { id } });
+      return true;
+    } catch (dbErr) {
+      console.error('Prisma deleteCollege failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  /* ─── Student Profile & College Association ─────────────── */
+  async getUserProfile(nickname: string) {
+    const cleanNick = nickname.trim();
+    try {
       return await db.userProfile.findUnique({
-        where: { nickname },
+        where: { nickname: cleanNick },
+        include: {
+          college: true,
+        },
       });
     } catch (dbErr) {
       console.error('Prisma getUserProfile fallback failed:', dbErr);
@@ -383,45 +524,45 @@ export const dataService = {
     isNicknameSame: boolean;
     email: string;
     emailType: 'college' | 'personal';
+    collegeId?: number;
+    passwordHash?: string;
   }) {
-    const payload = {
-      fullName: profileData.fullName,
-      nickname: profileData.nickname,
+    let resolvedCollegeId = profileData.collegeId;
+
+    if (!resolvedCollegeId) {
+      const dummy = await this.getOrCreateDummyCollege();
+      resolvedCollegeId = dummy.id;
+    }
+
+    const updateData: any = {
+      fullName: profileData.fullName.trim(),
       isNicknameSame: profileData.isNicknameSame,
-      email: profileData.email,
+      email: profileData.email.trim().toLowerCase(),
       emailType: profileData.emailType,
-      updatedAt: new Date().toISOString(),
+      collegeId: resolvedCollegeId,
     };
 
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .upsert(payload, { onConflict: 'nickname' })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Supabase upsertUserProfile error:', error);
-        throw new Error(error.message);
-      }
-      return data;
+    if (profileData.passwordHash) {
+      updateData.passwordHash = profileData.passwordHash;
     }
+
+    const createData: any = {
+      fullName: profileData.fullName.trim(),
+      nickname: profileData.nickname.trim(),
+      isNicknameSame: profileData.isNicknameSame,
+      email: profileData.email.trim().toLowerCase(),
+      emailType: profileData.emailType,
+      collegeId: resolvedCollegeId,
+      passwordHash: profileData.passwordHash || null,
+    };
 
     try {
       return await db.userProfile.upsert({
-        where: { nickname: profileData.nickname },
-        update: {
-          fullName: profileData.fullName,
-          isNicknameSame: profileData.isNicknameSame,
-          email: profileData.email,
-          emailType: profileData.emailType,
-        },
-        create: {
-          fullName: profileData.fullName,
-          nickname: profileData.nickname,
-          isNicknameSame: profileData.isNicknameSame,
-          email: profileData.email,
-          emailType: profileData.emailType,
+        where: { nickname: profileData.nickname.trim() },
+        update: updateData,
+        create: createData,
+        include: {
+          college: true,
         },
       });
     } catch (dbErr) {
@@ -430,29 +571,198 @@ export const dataService = {
     }
   },
 
-  /* ─── Admin Users Management (Super Admin & Admin Auth) ─── */
-  async getAdminByEmail(email: string) {
-    const cleanEmail = email.trim().toLowerCase();
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from('admin_users')
-          .select('*')
-          .ilike('email', cleanEmail)
-          .maybeSingle();
+  async resetStudentPassword(nickname: string, passwordHash: string) {
+    try {
+      return await db.userProfile.update({
+        where: { nickname: nickname.trim() },
+        data: { passwordHash },
+      });
+    } catch (dbErr) {
+      console.error('Prisma resetStudentPassword failed:', dbErr);
+      throw dbErr;
+    }
+  },
 
-        if (!error && data) return data;
-        if (error && !error.message.includes('schema cache')) {
-          console.error('Supabase getAdminByEmail error:', error);
-        }
-      } catch (err) {
-        console.warn('Supabase getAdminByEmail failed:', err);
+  /* ─── College-Scoped Queries for Admins & Reports ────────── */
+  async getStudentsByCollege(collegeId?: number | null) {
+    try {
+      const whereClause = collegeId ? { collegeId } : {};
+      return await db.userProfile.findMany({
+        where: whereClause,
+        include: {
+          college: {
+            select: { id: true, name: true, identifier: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getStudentsByCollege failed:', dbErr);
+      return [];
+    }
+  },
+
+  async getAttemptsByCollege(collegeId?: number | null) {
+    try {
+      if (!collegeId) {
+        // Super admin - return all attempts
+        return await db.userAttempt.findMany({
+          orderBy: { createdAt: 'desc' },
+        });
       }
+
+      // Filter attempts belonging only to students of the specified college
+      const collegeStudents = await db.userProfile.findMany({
+        where: { collegeId },
+        select: { nickname: true },
+      });
+
+      const nicknames = collegeStudents.map(s => s.nickname.toLowerCase());
+      if (nicknames.length === 0) return [];
+
+      const allAttempts = await db.userAttempt.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return allAttempts.filter(a => nicknames.includes(a.userName.trim().toLowerCase()));
+    } catch (dbErr) {
+      console.error('Prisma getAttemptsByCollege failed:', dbErr);
+      return [];
+    }
+  },
+
+  async getStatsByCollege(collegeId?: number | null) {
+    try {
+      const questions = await this.getAllQuestions();
+      const totalQuestions = questions.length;
+      const activeQuestions = questions.filter((q: any) => q.active).length;
+
+      const attempts = await this.getAttemptsByCollege(collegeId);
+      const totalAttempts = attempts.length;
+
+      const students = await this.getStudentsByCollege(collegeId);
+      const totalUsers = students.length > 0
+        ? students.length
+        : new Set(attempts.map((a: any) => a.userName.toLowerCase())).size;
+
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const todayAttempts = attempts.filter((a: any) => a.quizDate === todayStr).length;
+
+      return {
+        totalQuestions,
+        activeQuestions,
+        totalAttempts,
+        totalUsers,
+        todayAttempts,
+      };
+    } catch (dbErr) {
+      console.error('Prisma getStatsByCollege failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  async getLeaderboardByCollege(collegeId?: number | null, period = 'daily') {
+    const cleanPeriod = (period || 'daily').toLowerCase().replace('-', '');
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    let minDateStr = '';
+    if (cleanPeriod === 'daily') {
+      minDateStr = todayStr;
+    } else if (cleanPeriod === 'weekly') {
+      const d = new Date(now);
+      const dayIndex = d.getDay();
+      const diffToMon = d.getDate() - dayIndex + (dayIndex === 0 ? -6 : 1);
+      const mon = new Date(d.setDate(diffToMon));
+      minDateStr = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+    } else if (cleanPeriod === 'monthly') {
+      minDateStr = `${year}-${month}-01`;
+    } else {
+      minDateStr = '1970-01-01';
     }
 
     try {
+      const attempts = await this.getAttemptsByCollege(collegeId);
+      const filtered = attempts.filter((a: any) => {
+        if (cleanPeriod === 'daily') return a.quizDate === todayStr;
+        if (cleanPeriod === 'alltime') return true;
+        return a.quizDate >= minDateStr;
+      });
+
+      const userStatsMap = new Map<string, {
+        userName: string;
+        attempts: number;
+        correctAnswers: number;
+        totalPoints: number;
+        totalResponseTime: number;
+        lastAttemptDate: string | Date;
+      }>();
+
+      for (const attempt of filtered) {
+        const key = attempt.userName.trim().toLowerCase();
+        const existing = userStatsMap.get(key) || {
+          userName: attempt.userName.trim(),
+          attempts: 0,
+          correctAnswers: 0,
+          totalPoints: 0,
+          totalResponseTime: 0,
+          lastAttemptDate: attempt.createdAt,
+        };
+
+        existing.attempts += 1;
+        if (attempt.isCorrect) existing.correctAnswers += 1;
+        existing.totalPoints += Number(attempt.totalPoints || 0);
+        existing.totalResponseTime += Number(attempt.responseTimeMs || 0);
+
+        if (new Date(attempt.createdAt) > new Date(existing.lastAttemptDate)) {
+          existing.lastAttemptDate = attempt.createdAt;
+        }
+
+        userStatsMap.set(key, existing);
+      }
+
+      const aggregated = Array.from(userStatsMap.values()).map((user) => ({
+        userName: user.userName,
+        attempts: user.attempts,
+        correctAnswers: user.correctAnswers,
+        totalPoints: Number(user.totalPoints.toFixed(2)),
+        avgResponseTimeMs: Math.round(user.totalResponseTime / user.attempts),
+        lastAttemptDate: new Date(user.lastAttemptDate).toISOString(),
+      }));
+
+      aggregated.sort((a, b) => {
+        if (Math.abs(b.totalPoints - a.totalPoints) > 0.001) {
+          return b.totalPoints - a.totalPoints;
+        }
+        if (b.correctAnswers !== a.correctAnswers) {
+          return b.correctAnswers - a.correctAnswers;
+        }
+        return a.avgResponseTimeMs - b.avgResponseTimeMs;
+      });
+
+      return aggregated.slice(0, 100).map((item, index) => ({
+        rank: index + 1,
+        ...item,
+      }));
+    } catch (dbErr) {
+      console.error('Prisma getLeaderboardByCollege failed:', dbErr);
+      return [];
+    }
+  },
+
+  /* ─── Admin Users Management (Super Admin & Admin Auth) ─── */
+  async getAdminByEmail(email: string) {
+    const cleanEmail = email.trim().toLowerCase();
+    try {
       return await db.adminUser.findFirst({
         where: { email: { equals: cleanEmail } },
+        include: {
+          college: true,
+        },
       });
     } catch (dbErr) {
       console.error('Prisma getAdminByEmail fallback failed:', dbErr);
@@ -461,23 +771,12 @@ export const dataService = {
   },
 
   async getAdminById(id: number) {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from('admin_users')
-          .select('*')
-          .eq('id', id)
-          .maybeSingle();
-
-        if (!error && data) return data;
-      } catch (err) {
-        console.warn('Supabase getAdminById failed:', err);
-      }
-    }
-
     try {
       return await db.adminUser.findUnique({
         where: { id },
+        include: {
+          college: true,
+        },
       });
     } catch (dbErr) {
       console.error('Prisma getAdminById fallback failed:', dbErr);
@@ -486,22 +785,6 @@ export const dataService = {
   },
 
   async getAllAdmins() {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from('admin_users')
-          .select('id, email, name, active, createdAt, updatedAt')
-          .order('createdAt', { ascending: false });
-
-        if (!error && data) return data;
-        if (error && !error.message.includes('schema cache')) {
-          console.error('Supabase getAllAdmins error:', error);
-        }
-      } catch (err) {
-        console.warn('Supabase getAllAdmins failed:', err);
-      }
-    }
-
     try {
       return await db.adminUser.findMany({
         select: {
@@ -509,6 +792,14 @@ export const dataService = {
           email: true,
           name: true,
           active: true,
+          collegeId: true,
+          college: {
+            select: {
+              id: true,
+              name: true,
+              identifier: true,
+            },
+          },
           createdAt: true,
           updatedAt: true,
         },
@@ -520,27 +811,14 @@ export const dataService = {
     }
   },
 
-  async createAdmin(data: { email: string; passwordHash: string; name?: string; active?: boolean }) {
-    const payload = {
+  async createAdmin(data: { email: string; passwordHash: string; name?: string; active?: boolean; collegeId?: number }) {
+    const payload: any = {
       email: data.email.trim().toLowerCase(),
       passwordHash: data.passwordHash,
       name: data.name?.trim() || null,
       active: data.active ?? true,
+      collegeId: data.collegeId || null,
     };
-
-    if (isSupabaseConfigured) {
-      const { data: record, error } = await supabase
-        .from('admin_users')
-        .insert(payload)
-        .select('id, email, name, active, createdAt, updatedAt')
-        .single();
-
-      if (!error && record) return record;
-      if (error) {
-        console.error('Supabase createAdmin error:', error);
-        throw new Error(error.message);
-      }
-    }
 
     try {
       return await db.adminUser.create({
@@ -550,6 +828,10 @@ export const dataService = {
           email: true,
           name: true,
           active: true,
+          collegeId: true,
+          college: {
+            select: { id: true, name: true, identifier: true },
+          },
           createdAt: true,
           updatedAt: true,
         },
@@ -560,28 +842,14 @@ export const dataService = {
     }
   },
 
-  async updateAdmin(id: number, data: { name?: string; active?: boolean; passwordHash?: string }) {
+  async updateAdmin(id: number, data: { name?: string; active?: boolean; passwordHash?: string; collegeId?: number }) {
     const payload: any = {
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date(),
     };
-    if (data.name !== undefined) payload.name = data.name.trim();
+    if (data.name !== undefined) payload.name = data.name ? data.name.trim() : null;
     if (data.active !== undefined) payload.active = data.active;
     if (data.passwordHash !== undefined) payload.passwordHash = data.passwordHash;
-
-    if (isSupabaseConfigured) {
-      const { data: record, error } = await supabase
-        .from('admin_users')
-        .update(payload)
-        .eq('id', id)
-        .select('id, email, name, active, createdAt, updatedAt')
-        .single();
-
-      if (!error && record) return record;
-      if (error) {
-        console.error('Supabase updateAdmin error:', error);
-        throw new Error(error.message);
-      }
-    }
+    if (data.collegeId !== undefined) payload.collegeId = data.collegeId;
 
     try {
       return await db.adminUser.update({
@@ -592,6 +860,10 @@ export const dataService = {
           email: true,
           name: true,
           active: true,
+          collegeId: true,
+          college: {
+            select: { id: true, name: true, identifier: true },
+          },
           createdAt: true,
           updatedAt: true,
         },
@@ -603,19 +875,6 @@ export const dataService = {
   },
 
   async deleteAdmin(id: number) {
-    if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('admin_users')
-        .delete()
-        .eq('id', id);
-
-      if (!error) return true;
-      if (error) {
-        console.error('Supabase deleteAdmin error:', error);
-        throw new Error(error.message);
-      }
-    }
-
     try {
       await db.adminUser.delete({ where: { id } });
       return true;
@@ -625,5 +884,6 @@ export const dataService = {
     }
   }
 };
+
 
 

@@ -5,6 +5,7 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { activeSessions } from '@/lib/sessionStore';
 import { shuffleOptions } from '@/lib/antiCheat';
 import { signSessionToken } from '@/lib/sessionToken';
+import { getStudentGracePeriodStatus, isDummyCollege } from '@/lib/collegeNormalization';
 
 export async function GET(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
@@ -30,6 +31,33 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Backend enforcement: Check 5-day grace period for valid college & password
+  const profile = await dataService.getUserProfile(userName.trim());
+  if (profile) {
+    const graceStatus = getStudentGracePeriodStatus(profile.createdAt);
+    if (graceStatus.isBeyondGracePeriod) {
+      if (isDummyCollege(profile.college?.name)) {
+        return NextResponse.json(
+          {
+            success: false,
+            state: 'COLLEGE_REQUIRED',
+            message: 'Your college/school information is required to continue. Please update your profile with the exact name provided by your college administrator.',
+          },
+          { status: 403 }
+        );
+      }
+      if (!profile.passwordHash) {
+        return NextResponse.json(
+          {
+            success: false,
+            state: 'PASSWORD_REQUIRED',
+            message: 'Please set a secure password in your profile to continue using the application.',
+          },
+          { status: 403 }
+        );
+      }
+    }
+  }
 
   // Double-check if user already attempted today — Strictly ONE QUESTION PER DAY
   const existingAttempt = await dataService.getUserAttemptToday(userName.trim(), guard.quizDate);
@@ -44,6 +72,7 @@ export async function GET(req: NextRequest) {
       { status: 403 }
     );
   }
+
 
 
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dataService } from '@/lib/dataService';
+import { verifyAdminRequest } from '@/lib/auth';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 const QUIZ_TOPICS = [
@@ -43,8 +44,24 @@ export async function GET(req: NextRequest) {
   const cleanName = userName.trim();
 
   try {
+    // If request contains admin token, enforce admin college boundary
+    const tokenHeader = req.headers.get('x-admin-token') || req.headers.get('authorization');
+    if (tokenHeader) {
+      const { isAuth, admin } = await verifyAdminRequest(req);
+      if (isAuth && admin && !admin.isSuperAdmin && admin.collegeId) {
+        const student = await dataService.getUserProfile(cleanName);
+        if (student && student.collegeId !== admin.collegeId) {
+          return NextResponse.json(
+            { success: false, message: 'Forbidden: You cannot access student reports from other institutions.' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     const attempts = await dataService.getUserAttempts(cleanName);
     const categoryCountsMap = await dataService.getQuestionsCategoryCounts();
+
     // Calculate total bank questions across all active categories in DB
     const totalBankQuestionsAll = Math.max(
       1,

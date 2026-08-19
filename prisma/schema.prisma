@@ -42,6 +42,17 @@ model UserAttempt {
   @@map("user_attempts")
 }
 
+model College {
+  id         Int           @id @default(autoincrement())
+  name       String        @unique
+  identifier String        @unique
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  admins     AdminUser[]
+  students   UserProfile[]
+
+  @@map("colleges")
+}
 
 model UserProfile {
   id             Int      @id @default(autoincrement())
@@ -50,11 +61,15 @@ model UserProfile {
   isNicknameSame Boolean  @default(false)
   email          String
   emailType      String   @default("college") // "college" or "personal"
+  collegeId      Int
+  college        College  @relation(fields: [collegeId], references: [id])
+  passwordHash   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([nickname])
   @@index([email])
+  @@index([collegeId])
   @@map("user_profiles")
 }
 
@@ -64,11 +79,15 @@ model AdminUser {
   passwordHash String
   name         String?
   active       Boolean  @default(true)
+  collegeId    Int?
+  college      College? @relation(fields: [collegeId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@index([email])
+  @@index([collegeId])
   @@map("admin_users")
 }
+
 
 

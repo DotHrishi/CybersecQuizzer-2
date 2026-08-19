@@ -65,5 +65,36 @@ export const ProfileSchema = z.object({
   emailType: z.enum(['college', 'personal'], {
     errorMap: () => ({ message: 'Email type must be college or personal.' }),
   }).default('college'),
+  collegeName: z.string().trim().optional(),
+  password: z.string().optional(),
 });
+
+// College Schema for Super Admin
+export const CollegeSchema = z.object({
+  name: z
+    .string({ required_error: 'College name is required.' })
+    .trim()
+    .min(2, 'College name must be at least 2 characters long.')
+    .max(150, 'College name must be at most 150 characters long.'),
+  identifier: z
+    .string({ required_error: 'College identifier is required.' })
+    .trim()
+    .min(2, 'Identifier must be at least 2 characters long.')
+    .max(50, 'Identifier must be at most 50 characters long.')
+    .regex(/^[a-zA-Z0-9_\-]+$/, 'Identifier can only contain letters, numbers, hyphens, or underscores.'),
+});
+
+// Admin Account Creation Schema for Super Admin
+export const AdminCreateSchema = z.object({
+  email: z
+    .string({ required_error: 'Admin email is required.' })
+    .trim()
+    .toLowerCase()
+    .email('Admin username must be a valid email address.'),
+  name: z.string().trim().optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters long.'),
+  collegeId: z.coerce.number({ required_error: 'College selection is required.' }).int().positive('Please select a valid college.'),
+  active: z.boolean().default(true),
+});
+
 

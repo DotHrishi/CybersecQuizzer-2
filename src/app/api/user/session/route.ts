@@ -4,6 +4,7 @@ import { getDynamicQuizGuardStatus } from '@/lib/quizGuard';
 import { getDynamicGuardMessage } from '@/lib/groqMessageGenerator';
 import { UserNameSchema } from '@/lib/validation';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { getStudentGracePeriodStatus, isDummyCollege } from '@/lib/collegeNormalization';
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
@@ -46,7 +47,31 @@ export async function POST(req: NextRequest) {
       });
     }
 
-
+    // Backend enforcement: Check 5-day grace period for valid college & password
+    const profile = await dataService.getUserProfile(userName);
+    if (profile) {
+      const graceStatus = getStudentGracePeriodStatus(profile.createdAt);
+      if (graceStatus.isBeyondGracePeriod) {
+        if (isDummyCollege(profile.college?.name)) {
+          return NextResponse.json({
+            success: true,
+            userName,
+            guardState: 'COLLEGE_REQUIRED',
+            isOpen: false,
+            message: 'Your college/school information is required to continue. Please update your profile with the exact name provided by your college administrator.',
+          });
+        }
+        if (!profile.passwordHash) {
+          return NextResponse.json({
+            success: true,
+            userName,
+            guardState: 'PASSWORD_REQUIRED',
+            isOpen: false,
+            message: 'Please set a secure password in your profile to continue using the application.',
+          });
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -59,3 +84,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'SERVER_ERROR', message: error.message }, { status: 500 });
   }
 }
+

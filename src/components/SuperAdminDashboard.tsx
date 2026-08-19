@@ -7,15 +7,33 @@ import {
   CheckCircle2, XCircle, Search, RefreshCw, Eye, EyeOff,
   UserCheck, UserX, Copy, Check, LogOut, ArrowLeft,
   Sparkles, Users, AlertTriangle, X, Loader2, Sun, Moon,
-  User, Building2
+  User, Building2, Edit3, School, GraduationCap
 } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import toast from 'react-hot-toast';
 
+interface CollegeItem {
+  id: number;
+  name: string;
+  identifier: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    admins: number;
+    students: number;
+  };
+}
+
 interface AdminAccount {
   id: number;
-  email: string; // Used as the unique username/identifier
-  name: string | null; // Used as the school name
+  email: string;
+  name: string | null;
+  collegeId: number | null;
+  college?: {
+    id: number;
+    name: string;
+    identifier: string;
+  } | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -42,16 +60,40 @@ export default function SuperAdminDashboard() {
   const [showMasterPassword, setShowMasterPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
 
+  /* Active view tab */
+  const [activeTab, setActiveTab] = useState<'colleges' | 'admins'>('colleges');
+
+  /* Colleges data */
+  const [colleges, setColleges] = useState<CollegeItem[]>([]);
+  const [loadingColleges, setLoadingColleges] = useState(false);
+  const [collegeSearch, setCollegeSearch] = useState('');
+
+  /* College Modals */
+  const [addCollegeModalOpen, setAddCollegeModalOpen] = useState(false);
+  const [newCollegeName, setNewCollegeName] = useState('');
+  const [newCollegeIdentifier, setNewCollegeIdentifier] = useState('');
+  const [isSavingCollege, setIsSavingCollege] = useState(false);
+
+  const [editCollegeModal, setEditCollegeModal] = useState<CollegeItem | null>(null);
+  const [editCollegeName, setEditCollegeName] = useState('');
+  const [editCollegeIdentifier, setEditCollegeIdentifier] = useState('');
+  const [isUpdatingCollege, setIsUpdatingCollege] = useState(false);
+
+  const [deleteCollegeModal, setDeleteCollegeModal] = useState<CollegeItem | null>(null);
+  const [isDeletingCollege, setIsDeletingCollege] = useState(false);
+
   /* Admins data */
   const [admins, setAdmins] = useState<AdminAccount[]>([]);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
+  const [collegeFilter, setCollegeFilter] = useState<string>('all');
 
-  /* Modals */
+  /* Admin Modals */
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [newUsername, setNewUsername] = useState('');
-  const [newSchoolName, setNewSchoolName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminCollegeId, setNewAdminCollegeId] = useState<number | ''>('');
   const [newPassword, setNewPassword] = useState('');
   const [newActive, setNewActive] = useState(true);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -78,6 +120,38 @@ export default function SuperAdminDashboard() {
     setAuthLoading(false);
   }, []);
 
+  /* ── Fetch Colleges List ── */
+  const fetchColleges = useCallback(async (authToken?: string) => {
+    const activeToken = authToken || token;
+    if (!activeToken) return;
+
+    setLoadingColleges(true);
+    try {
+      const res = await fetch('/api/superadmin/colleges', {
+        headers: { 'x-superadmin-token': activeToken },
+      });
+
+      if (res.status === 401) {
+        toast.error('Super Admin session expired. Please log in again.');
+        sessionStorage.removeItem(STORAGE_KEY);
+        setToken(null);
+        setIsAuthenticated(false);
+        return;
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        setColleges(data.colleges || []);
+      } else {
+        toast.error(data.message || 'Failed to load colleges.');
+      }
+    } catch {
+      toast.error('Network error loading colleges.');
+    } finally {
+      setLoadingColleges(false);
+    }
+  }, [token]);
+
   /* ── Fetch Admins List ── */
   const fetchAdmins = useCallback(async (authToken?: string) => {
     const activeToken = authToken || token;
@@ -86,9 +160,7 @@ export default function SuperAdminDashboard() {
     setLoadingAdmins(true);
     try {
       const res = await fetch('/api/superadmin/admins', {
-        headers: {
-          'x-superadmin-token': activeToken,
-        },
+        headers: { 'x-superadmin-token': activeToken },
       });
 
       if (res.status === 401) {
@@ -114,17 +186,15 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     if (isAuthenticated && token) {
+      fetchColleges(token);
       fetchAdmins(token);
     }
-  }, [isAuthenticated, token, fetchAdmins]);
+  }, [isAuthenticated, token, fetchColleges, fetchAdmins]);
 
-  /* ── Login Handler ── */
+  /* ── Super Admin Login ── */
   const handleSuperAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!masterPassword.trim()) {
-      toast.error('Please enter the Super Admin master key.');
-      return;
-    }
+    if (!masterPassword.trim()) return;
 
     setLoginLoading(true);
     try {
@@ -136,23 +206,24 @@ export default function SuperAdminDashboard() {
 
       const data = await res.json();
       if (data.success && data.token) {
-        toast.success('Super Admin authenticated!');
         sessionStorage.setItem(STORAGE_KEY, data.token);
         setToken(data.token);
         setIsAuthenticated(true);
         setMasterPassword('');
+        toast.success('Super Admin authenticated successfully.');
+        fetchColleges(data.token);
         fetchAdmins(data.token);
       } else {
-        toast.error(data.message || 'Invalid Super Admin key.');
+        toast.error(data.message || 'Invalid Master Password.');
       }
     } catch {
-      toast.error('Connection error. Please try again.');
+      toast.error('Authentication failed due to network error.');
     } finally {
       setLoginLoading(false);
     }
   };
 
-  /* ── Logout Handler ── */
+  /* ── Logout ── */
   const handleLogout = () => {
     sessionStorage.removeItem(STORAGE_KEY);
     setToken(null);
@@ -160,19 +231,111 @@ export default function SuperAdminDashboard() {
     toast.success('Super Admin logged out.');
   };
 
-  /* ── Create Admin Handler ── */
+  /* ── Create College ── */
+  const handleCreateCollege = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCollegeName.trim() || !newCollegeIdentifier.trim()) {
+      toast.error('Both Official Name and Identifier Code are required.');
+      return;
+    }
+
+    setIsSavingCollege(true);
+    try {
+      const res = await fetch('/api/superadmin/colleges', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-superadmin-token': token || '',
+        },
+        body: JSON.stringify({
+          name: newCollegeName.trim(),
+          identifier: newCollegeIdentifier.trim().toUpperCase(),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`College "${data.college.name}" created successfully!`);
+        setAddCollegeModalOpen(false);
+        setNewCollegeName('');
+        setNewCollegeIdentifier('');
+        fetchColleges();
+      } else {
+        toast.error(data.message || 'Failed to create college.');
+      }
+    } catch {
+      toast.error('Network error creating college.');
+    } finally {
+      setIsSavingCollege(false);
+    }
+  };
+
+  /* ── Update College ── */
+  const handleUpdateCollege = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCollegeModal) return;
+
+    setIsUpdatingCollege(true);
+    try {
+      const res = await fetch('/api/superadmin/colleges', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-superadmin-token': token || '',
+        },
+        body: JSON.stringify({
+          id: editCollegeModal.id,
+          name: editCollegeName.trim(),
+          identifier: editCollegeIdentifier.trim().toUpperCase(),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success('College updated successfully!');
+        setEditCollegeModal(null);
+        fetchColleges();
+      } else {
+        toast.error(data.message || 'Failed to update college.');
+      }
+    } catch {
+      toast.error('Network error updating college.');
+    } finally {
+      setIsUpdatingCollege(false);
+    }
+  };
+
+  /* ── Delete College ── */
+  const handleDeleteCollege = async () => {
+    if (!deleteCollegeModal) return;
+
+    setIsDeletingCollege(true);
+    try {
+      const res = await fetch(`/api/superadmin/colleges?id=${deleteCollegeModal.id}`, {
+        method: 'DELETE',
+        headers: { 'x-superadmin-token': token || '', },
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`College "${deleteCollegeModal.name}" deleted.`);
+        setDeleteCollegeModal(null);
+        fetchColleges();
+      } else {
+        toast.error(data.message || 'Failed to delete college.');
+      }
+    } catch {
+      toast.error('Network error deleting college.');
+    } finally {
+      setIsDeletingCollege(false);
+    }
+  };
+
+  /* ── Create Admin ── */
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername.trim()) {
-      toast.error('Admin username is required.');
-      return;
-    }
-    if (!newSchoolName.trim()) {
-      toast.error('School name is required.');
-      return;
-    }
-    if (!newPassword.trim() || newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters.');
+    if (!newEmail.trim() || !newPassword.trim() || !newAdminCollegeId) {
+      toast.error('Email, College selection, and Password are all required.');
       return;
     }
 
@@ -185,8 +348,9 @@ export default function SuperAdminDashboard() {
           'x-superadmin-token': token || '',
         },
         body: JSON.stringify({
-          username: newUsername.trim(),
-          name: newSchoolName.trim(),
+          email: newEmail.trim().toLowerCase(),
+          name: newAdminName.trim() || undefined,
+          collegeId: Number(newAdminCollegeId),
           password: newPassword,
           active: newActive,
         }),
@@ -194,13 +358,15 @@ export default function SuperAdminDashboard() {
 
       const data = await res.json();
       if (data.success) {
-        toast.success(`Admin account "${newUsername}" created for ${newSchoolName}!`);
+        toast.success(`Admin account created for "${newEmail}"!`);
         setAddModalOpen(false);
-        setNewUsername('');
-        setNewSchoolName('');
+        setNewEmail('');
+        setNewAdminName('');
+        setNewAdminCollegeId('');
         setNewPassword('');
         setNewActive(true);
         fetchAdmins();
+        fetchColleges();
       } else {
         toast.error(data.message || 'Failed to create admin.');
       }
@@ -284,9 +450,7 @@ export default function SuperAdminDashboard() {
     try {
       const res = await fetch(`/api/superadmin/admins?id=${deleteModalAdmin.id}`, {
         method: 'DELETE',
-        headers: {
-          'x-superadmin-token': token || '',
-        },
+        headers: { 'x-superadmin-token': token || '', },
       });
 
       const data = await res.json();
@@ -294,6 +458,7 @@ export default function SuperAdminDashboard() {
         toast.success(`Admin "${deleteModalAdmin.email}" deleted.`);
         setAdmins(prev => prev.filter(a => a.id !== deleteModalAdmin.id));
         setDeleteModalAdmin(null);
+        fetchColleges();
       } else {
         toast.error(data.message || 'Failed to delete admin.');
       }
@@ -304,27 +469,33 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  /* ── Filtered Admins ── */
+  /* ── Filtered Admins & Colleges ── */
+  const nonDummyColleges = colleges.filter(c => c.identifier !== 'DUMMY' && c.name !== 'Enter-your-college');
+
+  const filteredColleges = colleges.filter(c => {
+    if (!collegeSearch.trim()) return true;
+    const q = collegeSearch.toLowerCase();
+    return c.name.toLowerCase().includes(q) || c.identifier.toLowerCase().includes(q);
+  });
+
   const filteredAdmins = admins.filter(a => {
     const matchesSearch =
       a.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (a.name && a.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      (a.name && a.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (a.college?.name && a.college.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     if (!matchesSearch) return false;
     if (statusFilter === 'active' && !a.active) return false;
     if (statusFilter === 'disabled' && a.active) return false;
+    if (collegeFilter !== 'all') {
+      if (a.collegeId !== Number(collegeFilter)) return false;
+    }
     return true;
   });
 
   const totalAdmins = admins.length;
-  const uniqueSchools = new Set(
-    admins
-      .map(a => a.name?.trim().toLowerCase())
-      .filter((name): name is string => Boolean(name && name.length > 0))
-  ).size;
   const activeAdmins = admins.filter(a => a.active).length;
-  const disabledAdmins = totalAdmins - activeAdmins;
-
+  const totalConfiguredColleges = nonDummyColleges.length;
 
   /* ── Top Header Component for SuperAdmin Portal ── */
   const SuperAdminHeader = () => (
@@ -400,11 +571,9 @@ export default function SuperAdminDashboard() {
 
         <div className="max-w-md mx-auto my-8 px-4 w-full">
           <div className="card p-8 border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900 text-center space-y-6 relative overflow-hidden">
-            {/* Subtle glowing accent */}
             <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
 
-            {/* Superadmin Icon */}
             <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500/20 to-indigo-500/20 border border-amber-500/30 flex items-center justify-center shadow-inner">
               <Key className="w-8 h-8 text-amber-600 dark:text-amber-400" />
             </div>
@@ -418,7 +587,7 @@ export default function SuperAdminDashboard() {
                 Super Admin Gateway
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                Enter your master password to create and manage school admin credentials.
+                Enter your master password to configure colleges and manage school admin credentials.
               </p>
             </div>
 
@@ -490,58 +659,105 @@ export default function SuperAdminDashboard() {
       <SuperAdminHeader />
 
       <div className="max-w-6xl mx-auto px-4 space-y-8">
-        {/* Top Banner & Controls */}
+        {/* Top Header & Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
           <div>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Admin Credential Management
+              Institution &amp; Admin Management
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Provision usernames, school names, and passwords for administrators who manage questions and access reports at <span className="font-semibold text-slate-700 dark:text-slate-300">/admin</span>.
+              Configure participating colleges/schools, provision administrators, and scope reporting boundaries.
             </p>
           </div>
 
-
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => {
-                setNewUsername('');
-                setNewSchoolName('');
-                setNewPassword(''); // Keep blank initially
-                setNewActive(true);
-                setCopiedNewCreds(false);
-                setShowNewPassword(false);
-                setAddModalOpen(true);
-              }}
-              className="btn btn-primary btn-md gap-2 shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add New Admin</span>
-            </button>
+            {activeTab === 'colleges' ? (
+              <button
+                onClick={() => {
+                  setNewCollegeName('');
+                  setNewCollegeIdentifier('');
+                  setAddCollegeModalOpen(true);
+                }}
+                className="btn btn-primary btn-md gap-2 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Configure College</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setNewEmail('');
+                  setNewAdminName('');
+                  setNewAdminCollegeId(nonDummyColleges.length > 0 ? nonDummyColleges[0].id : '');
+                  setNewPassword('');
+                  setNewActive(true);
+                  setCopiedNewCreds(false);
+                  setShowNewPassword(false);
+                  setAddModalOpen(true);
+                }}
+                className="btn btn-primary btn-md gap-2 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add New Admin</span>
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-px">
+          <button
+            onClick={() => setActiveTab('colleges')}
+            className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'colleges'
+                ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <School className="w-4 h-4" />
+            <span>Colleges &amp; Schools</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+              {totalConfiguredColleges}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('admins')}
+            className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'admins'
+                ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Admin Accounts</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              {totalAdmins}
+            </span>
+          </button>
         </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="card p-5 flex items-center justify-between border-amber-200/60 dark:border-amber-900/40">
+            <div>
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Configured Colleges</p>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{totalConfiguredColleges}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Active participating colleges</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center">
+              <School className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            </div>
+          </div>
+
           <div className="card p-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Admins</p>
               <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{totalAdmins}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Admin accounts created</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Provisioned admin accounts</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
               <Users className="w-6 h-6 text-slate-700 dark:text-slate-300" />
-            </div>
-          </div>
-
-          <div className="card p-5 flex items-center justify-between border-indigo-200/60 dark:border-indigo-900/40">
-            <div>
-              <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Total Schools</p>
-              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{uniqueSchools}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Unique participating schools</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
 
@@ -549,7 +765,7 @@ export default function SuperAdminDashboard() {
             <div>
               <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Active Admins</p>
               <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{activeAdmins}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">{disabledAdmins > 0 ? `${disabledAdmins} disabled` : 'All accounts active'}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Enabled school administrators</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
               <UserCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
@@ -557,194 +773,478 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-
-        {/* Admin List Table Card */}
-        <div className="card overflow-hidden">
-          {/* Table Header & Search Filter Bar */}
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/20">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Admin Accounts List</h2>
-              <span className="text-xs text-slate-400">({filteredAdmins.length})</span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Search Input */}
-              <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Search username or school name..."
-                  className="field-input pl-8 py-1.5 text-xs w-full"
-                />
-                {searchTerm && (
-                  <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
+        {/* ── TAB 1: Colleges & Schools ── */}
+        {activeTab === 'colleges' && (
+          <div className="card overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/20">
+              <div className="flex items-center gap-2">
+                <School className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Configured Colleges &amp; Schools</h2>
+                <span className="text-xs text-slate-400">({filteredColleges.length})</span>
               </div>
 
-              {/* Filter Pill */}
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as any)}
-                className="field-input py-1.5 px-2 text-xs w-auto"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active Only</option>
-                <option value="disabled">Disabled Only</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <div className="relative min-w-[220px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={collegeSearch}
+                    onChange={e => setCollegeSearch(e.target.value)}
+                    placeholder="Search college name or identifier..."
+                    className="field-input pl-8 py-1.5 text-xs w-full"
+                  />
+                  {collegeSearch && (
+                    <button onClick={() => setCollegeSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
 
-              {/* Refresh Button */}
-              <button
-                onClick={() => fetchAdmins()}
-                disabled={loadingAdmins}
-                title="Refresh list"
-                className="btn btn-secondary btn-sm px-2.5"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingAdmins ? 'animate-spin' : ''}`} />
-              </button>
+                <button
+                  onClick={() => fetchColleges()}
+                  disabled={loadingColleges}
+                  title="Refresh colleges"
+                  className="btn btn-secondary btn-sm px-2.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingColleges ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            <div className="table-wrapper">
+              <table className="table-base">
+                <thead className="table-head">
+                  <tr>
+                    <th className="table-th">Official College Name</th>
+                    <th className="table-th">Identifier Code</th>
+                    <th className="table-th text-center">Admins</th>
+                    <th className="table-th text-center">Enrolled Students</th>
+                    <th className="table-th text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingColleges && colleges.length === 0 ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <tr key={i} className="border-b border-slate-100 dark:border-slate-800 animate-pulse">
+                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-48" /></td>
+                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-20" /></td>
+                        <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-12 mx-auto" /></td>
+                        <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-12 mx-auto" /></td>
+                        <td className="table-td text-right"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-16 ml-auto" /></td>
+                      </tr>
+                    ))
+                  ) : filteredColleges.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-slate-400">
+                        <div className="max-w-xs mx-auto space-y-3">
+                          <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                            <School className="w-6 h-6 text-slate-400" />
+                          </div>
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            {collegeSearch ? 'No colleges match your search.' : 'No colleges configured yet.'}
+                          </p>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Click &quot;Configure College&quot; to add participating institutions.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredColleges.map(c => {
+                      const isDummy = c.identifier === 'DUMMY' || c.name === 'Enter-your-college';
+                      return (
+                        <tr key={c.id} className="table-row">
+                          <td className="table-td font-semibold text-slate-900 dark:text-white">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-amber-500 shrink-0" />
+                              <span>{c.name}</span>
+                              {isDummy && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                  Default Placeholder
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="table-td font-mono text-xs text-slate-700 dark:text-slate-300">
+                            <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold">
+                              {c.identifier}
+                            </span>
+                          </td>
+
+                          <td className="table-td text-center text-xs font-bold text-slate-700 dark:text-slate-300">
+                            {c._count?.admins ?? 0}
+                          </td>
+
+                          <td className="table-td text-center text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                            {c._count?.students ?? 0}
+                          </td>
+
+                          <td className="table-td text-right">
+                            {isDummy ? (
+                              <span className="text-[11px] text-slate-400 italic">System Managed</span>
+                            ) : (
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setEditCollegeModal(c);
+                                    setEditCollegeName(c.name);
+                                    setEditCollegeIdentifier(c.identifier);
+                                  }}
+                                  title="Edit College"
+                                  className="btn-icon text-slate-600 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+
+                                <button
+                                  onClick={() => setDeleteCollegeModal(c)}
+                                  title="Delete College"
+                                  className="btn-icon text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
+        )}
 
-          {/* Table Content */}
-          <div className="table-wrapper">
-            <table className="table-base">
-              <thead className="table-head">
-                <tr>
-                  <th className="table-th">Admin Username</th>
-                  <th className="table-th">School Name</th>
-                  <th className="table-th text-center">Status</th>
-                  <th className="table-th">Created Date</th>
-                  <th className="table-th text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingAdmins && admins.length === 0 ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <tr key={i} className="border-b border-slate-100 dark:border-slate-800 animate-pulse">
-                      <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-44" /></td>
-                      <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-28" /></td>
-                      <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-16 mx-auto" /></td>
-                      <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
-                      <td className="table-td text-right"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-20 ml-auto" /></td>
-                    </tr>
-                  ))
-                ) : filteredAdmins.length === 0 ? (
+        {/* ── TAB 2: Admin Accounts List ── */}
+        {activeTab === 'admins' && (
+          <div className="card overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/20">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Admin Accounts List</h2>
+                <span className="text-xs text-slate-400">({filteredAdmins.length})</span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[200px] flex-1 sm:flex-initial">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    placeholder="Search admin email or college..."
+                    className="field-input pl-8 py-1.5 text-xs w-full"
+                  />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <select
+                  value={collegeFilter}
+                  onChange={e => setCollegeFilter(e.target.value)}
+                  className="field-input py-1.5 px-2 text-xs w-auto"
+                >
+                  <option value="all">All Colleges</option>
+                  {nonDummyColleges.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as any)}
+                  className="field-input py-1.5 px-2 text-xs w-auto"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active Only</option>
+                  <option value="disabled">Disabled Only</option>
+                </select>
+
+                <button
+                  onClick={() => fetchAdmins()}
+                  disabled={loadingAdmins}
+                  title="Refresh list"
+                  className="btn btn-secondary btn-sm px-2.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingAdmins ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            <div className="table-wrapper">
+              <table className="table-base">
+                <thead className="table-head">
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400">
-                      <div className="max-w-xs mx-auto space-y-3">
-                        <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                          <Users className="w-6 h-6 text-slate-400" />
-                        </div>
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                          {searchTerm ? 'No admins matching filter.' : 'No admin credentials registered yet.'}
-                        </p>
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                          Click &quot;Add New Admin&quot; to provision username, school name, and password for school quiz administrators.
-                        </p>
-                      </div>
-                    </td>
+                    <th className="table-th">Admin Email</th>
+                    <th className="table-th">Assigned College / School</th>
+                    <th className="table-th text-center">Status</th>
+                    <th className="table-th">Created Date</th>
+                    <th className="table-th text-right">Actions</th>
                   </tr>
-                ) : (
-                  filteredAdmins.map(admin => (
-                    <tr key={admin.id} className="table-row">
-                      <td className="table-td font-semibold text-slate-900 dark:text-white">
-                        <div className="flex items-center gap-2">
-                          <span className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-300">
-                            {admin.email.charAt(0).toUpperCase()}
-                          </span>
-                          <span className="font-mono text-xs">{admin.email}</span>
-                        </div>
-                      </td>
-
-                      <td className="table-td text-slate-800 dark:text-slate-200 font-medium">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{admin.name || <span className="text-slate-400 italic">Not set</span>}</span>
-                        </div>
-                      </td>
-
-                      <td className="table-td text-center">
-                        <button
-                          onClick={() => handleToggleActive(admin)}
-                          title={`Click to ${admin.active ? 'disable' : 'activate'} this admin`}
-                          className={`badge cursor-pointer transition-all hover:scale-105 ${
-                            admin.active ? 'badge-green' : 'badge-red'
-                          }`}
-                        >
-                          {admin.active ? (
-                            <span className="flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Active
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <XCircle className="w-3 h-3" /> Disabled
-                            </span>
-                          )}
-                        </button>
-                      </td>
-
-                      <td className="table-td text-xs text-slate-500">
-                        {new Date(admin.createdAt).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </td>
-
-                      <td className="table-td text-right">
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            onClick={() => {
-                              setResetModalAdmin(admin);
-                              setResetPassword('');
-                              setShowResetPassword(false);
-                            }}
-                            title="Reset Password"
-                            className="btn-icon text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
-                          >
-                            <Key className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            onClick={() => setDeleteModalAdmin(admin)}
-                            title="Delete Admin Account"
-                            className="btn-icon text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                </thead>
+                <tbody>
+                  {loadingAdmins && admins.length === 0 ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <tr key={i} className="border-b border-slate-100 dark:border-slate-800 animate-pulse">
+                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-44" /></td>
+                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-28" /></td>
+                        <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-16 mx-auto" /></td>
+                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
+                        <td className="table-td text-right"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-20 ml-auto" /></td>
+                      </tr>
+                    ))
+                  ) : filteredAdmins.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-slate-400">
+                        <div className="max-w-xs mx-auto space-y-3">
+                          <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                            <Users className="w-6 h-6 text-slate-400" />
+                          </div>
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            {searchTerm ? 'No admins matching filter.' : 'No admin credentials registered yet.'}
+                          </p>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Click &quot;Add New Admin&quot; to provision an admin for a configured college.
+                          </p>
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  ) : (
+                    filteredAdmins.map(admin => (
+                      <tr key={admin.id} className="table-row">
+                        <td className="table-td font-semibold text-slate-900 dark:text-white">
+                          <div className="flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-300">
+                              {admin.email.charAt(0).toUpperCase()}
+                            </span>
+                            <div>
+                              <span className="font-mono text-xs">{admin.email}</span>
+                              {admin.name && (
+                                <p className="text-[11px] text-slate-400 font-normal">{admin.name}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
 
-        {/* Instructional Card */}
-        <div className="card p-5 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
-            <ShieldAlert className="w-4 h-4 text-amber-500" />
-            <span>Super Admin Security Rules</span>
+                        <td className="table-td text-slate-800 dark:text-slate-200 font-medium">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span>{admin.college?.name || <span className="text-slate-400 italic">Unassigned (Global)</span>}</span>
+                          </div>
+                        </td>
+
+                        <td className="table-td text-center">
+                          <button
+                            onClick={() => handleToggleActive(admin)}
+                            title={`Click to ${admin.active ? 'disable' : 'activate'} this admin`}
+                            className={`badge cursor-pointer transition-all hover:scale-105 ${
+                              admin.active ? 'badge-green' : 'badge-red'
+                            }`}
+                          >
+                            {admin.active ? (
+                              <span className="flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Active
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <XCircle className="w-3 h-3" /> Disabled
+                              </span>
+                            )}
+                          </button>
+                        </td>
+
+                        <td className="table-td text-xs text-slate-500">
+                          {new Date(admin.createdAt).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </td>
+
+                        <td className="table-td text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                setResetModalAdmin(admin);
+                                setResetPassword('');
+                                setShowResetPassword(false);
+                              }}
+                              title="Reset Password"
+                              className="btn-icon text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
+                            >
+                              <Key className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => setDeleteModalAdmin(admin)}
+                              title="Delete Admin Account"
+                              className="btn-icon text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <ul className="list-disc list-inside space-y-1 pl-1 text-slate-500">
-            <li>Normal admins log in with their assigned <strong>Username</strong> and <strong>Password</strong> at <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-800 dark:text-slate-200">/admin</code>.</li>
-            <li>The default fallback credentials are username <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-800 dark:text-slate-200 font-mono">admin</code> and password <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-800 dark:text-slate-200 font-mono">cyberadmin123</code>.</li>
-            <li>Disabling an admin account takes effect immediately, blocking their ability to modify questions or leaderboards.</li>
-          </ul>
-        </div>
+        )}
+
+        {/* ── Modal: Add New College ── */}
+        {addCollegeModalOpen && (
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setAddCollegeModalOpen(false); }}>
+            <div className="modal-panel max-w-[500px]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950 flex items-center justify-center">
+                    <School className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Configure New College / School</h3>
+                    <p className="text-[11px] text-slate-500">Add an official institution for student matching</p>
+                  </div>
+                </div>
+                <button onClick={() => setAddCollegeModalOpen(false)} className="btn-icon">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateCollege} className="p-6 space-y-4">
+                <div>
+                  <label className="field-label">Official College Name <span className="text-rose-500">*</span></label>
+                  <input
+                    type="text"
+                    value={newCollegeName}
+                    onChange={e => setNewCollegeName(e.target.value)}
+                    placeholder="e.g. MIT - WPU University Pune"
+                    className="field-input"
+                    required
+                    autoFocus
+                  />
+                  <p className="field-helper mt-1 text-[11px]">
+                    This is the exact full name that students will type to match their institution.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="field-label">Unique Identifier Code <span className="text-rose-500">*</span></label>
+                  <input
+                    type="text"
+                    value={newCollegeIdentifier}
+                    onChange={e => setNewCollegeIdentifier(e.target.value.toUpperCase())}
+                    placeholder="e.g. MITWPU-PUNE"
+                    className="field-input font-mono uppercase"
+                    required
+                  />
+                  <p className="field-helper mt-1 text-[11px]">
+                    Short code for reports and certificate serializing.
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                  <button type="button" onClick={() => setAddCollegeModalOpen(false)} className="btn btn-secondary btn-sm">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={isSavingCollege || !newCollegeName.trim() || !newCollegeIdentifier.trim()} className="btn btn-primary btn-sm gap-1.5">
+                    {isSavingCollege ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>Save College</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal: Edit College ── */}
+        {editCollegeModal && (
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditCollegeModal(null); }}>
+            <div className="modal-panel max-w-[500px]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit College</h3>
+                <button onClick={() => setEditCollegeModal(null)} className="btn-icon">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateCollege} className="p-6 space-y-4">
+                <div>
+                  <label className="field-label">Official College Name <span className="text-rose-500">*</span></label>
+                  <input
+                    type="text"
+                    value={editCollegeName}
+                    onChange={e => setEditCollegeName(e.target.value)}
+                    className="field-input"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="field-label">Identifier Code <span className="text-rose-500">*</span></label>
+                  <input
+                    type="text"
+                    value={editCollegeIdentifier}
+                    onChange={e => setEditCollegeIdentifier(e.target.value.toUpperCase())}
+                    className="field-input font-mono uppercase"
+                    required
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                  <button type="button" onClick={() => setEditCollegeModal(null)} className="btn btn-secondary btn-sm">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={isUpdatingCollege || !editCollegeName.trim() || !editCollegeIdentifier.trim()} className="btn btn-primary btn-sm gap-1.5">
+                    {isUpdatingCollege ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>Update College</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal: Confirm Delete College ── */}
+        {deleteCollegeModal && (
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeleteCollegeModal(null); }}>
+            <div className="modal-panel max-w-[420px]">
+              <div className="p-6 space-y-4">
+                <div className="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+
+                <div className="text-center space-y-1">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Delete College?</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Are you sure you want to delete <span className="font-semibold text-slate-800 dark:text-slate-200">{deleteCollegeModal.name}</span>?
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button type="button" onClick={() => setDeleteCollegeModal(null)} className="btn btn-secondary btn-sm">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={handleDeleteCollege} disabled={isDeletingCollege} className="btn btn-destructive btn-sm gap-1.5">
+                    {isDeletingCollege ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    <span>Confirm Delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Modal: Add New Admin ── */}
         {addModalOpen && (
-          <div
-            className="modal-overlay"
-            onClick={e => { if (e.target === e.currentTarget) setAddModalOpen(false); }}
-          >
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setAddModalOpen(false); }}>
             <div className="modal-panel max-w-[500px]">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
                 <div className="flex items-center gap-2">
@@ -752,8 +1252,8 @@ export default function SuperAdminDashboard() {
                     <User className="w-4 h-4 text-slate-800 dark:text-white" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add New Admin Account</h3>
-                    <p className="text-[11px] text-slate-500">All fields are compulsory</p>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add New School Admin Account</h3>
+                    <p className="text-[11px] text-slate-500">Associate an admin with a specific college</p>
                   </div>
                 </div>
                 <button onClick={() => setAddModalOpen(false)} className="btn-icon">
@@ -763,27 +1263,49 @@ export default function SuperAdminDashboard() {
 
               <form onSubmit={handleCreateAdmin} className="p-6 space-y-4">
                 <div>
-                  <label className="field-label">Admin Username <span className="text-rose-500">*</span></label>
+                  <label className="field-label">Admin Email Address <span className="text-rose-500">*</span></label>
                   <input
-                    type="text"
-                    value={newUsername}
-                    onChange={e => setNewUsername(e.target.value)}
-                    placeholder="e.g. cyberadmin1 or st_xaviers_admin"
-                    className="field-input"
+                    type="email"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                    placeholder="e.g. admin@mitwpu.edu.in or prof.sharma@gmail.com"
+                    className="field-input font-mono text-xs"
                     required
                     autoFocus
                   />
+                  <p className="field-helper mt-1 text-[11px]">
+                    Admin username must be a valid email address.
+                  </p>
                 </div>
 
                 <div>
-                  <label className="field-label">School Name <span className="text-rose-500">*</span></label>
+                  <label className="field-label">Assigned College / School <span className="text-rose-500">*</span></label>
+                  <select
+                    value={newAdminCollegeId}
+                    onChange={e => setNewAdminCollegeId(Number(e.target.value))}
+                    className="field-input text-xs"
+                    required
+                  >
+                    <option value="" disabled>Select a configured college...</option>
+                    {nonDummyColleges.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.identifier})</option>
+                    ))}
+                  </select>
+                  {nonDummyColleges.length === 0 && (
+                    <p className="text-rose-500 text-[11px] mt-1">
+                      No colleges configured yet. Please create a college first in the Colleges tab.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="field-label">Admin Full Name / Title (Optional)</label>
                   <input
                     type="text"
-                    value={newSchoolName}
-                    onChange={e => setNewSchoolName(e.target.value)}
-                    placeholder="e.g. St. Xavier's High School"
+                    value={newAdminName}
+                    onChange={e => setNewAdminName(e.target.value)}
+                    placeholder="e.g. Dr. Rajesh Sharma"
                     className="field-input"
-                    required
                   />
                 </div>
 
@@ -825,12 +1347,13 @@ export default function SuperAdminDashboard() {
                   {newPassword.trim() && (
                     <div className="mt-2 flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
                       <span className="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate max-w-[280px]">
-                        {newUsername || 'username'} : {newPassword}
+                        {newEmail || 'email'} : {newPassword}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(`School: ${newSchoolName || 'N/A'}\nUsername: ${newUsername || 'N/A'}\nPassword: ${newPassword}`);
+                          const col = nonDummyColleges.find(c => c.id === Number(newAdminCollegeId));
+                          navigator.clipboard.writeText(`College: ${col?.name || 'N/A'}\nEmail: ${newEmail || 'N/A'}\nPassword: ${newPassword}`);
                           setCopiedNewCreds(true);
                           toast.success('Credentials copied to clipboard!');
                           setTimeout(() => setCopiedNewCreds(false), 2500);
@@ -858,16 +1381,12 @@ export default function SuperAdminDashboard() {
                   </label>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAddModalOpen(false)}
-                      className="btn btn-secondary btn-sm"
-                    >
+                    <button type="button" onClick={() => setAddModalOpen(false)} className="btn btn-secondary btn-sm">
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      disabled={isSavingAdmin || !newUsername.trim() || !newSchoolName.trim() || !newPassword.trim()}
+                      disabled={isSavingAdmin || !newEmail.trim() || !newAdminCollegeId || !newPassword.trim()}
                       className="btn btn-primary btn-sm gap-1.5"
                     >
                       {isSavingAdmin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
@@ -882,15 +1401,10 @@ export default function SuperAdminDashboard() {
 
         {/* ── Modal: Reset Password ── */}
         {resetModalAdmin && (
-          <div
-            className="modal-overlay"
-            onClick={e => { if (e.target === e.currentTarget) setResetModalAdmin(null); }}
-          >
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setResetModalAdmin(null); }}>
             <div className="modal-panel max-w-[440px]">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Reset Admin Password
-                </h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reset Admin Password</h3>
                 <button onClick={() => setResetModalAdmin(null)} className="btn-icon">
                   <X className="w-4 h-4" />
                 </button>
@@ -898,10 +1412,10 @@ export default function SuperAdminDashboard() {
 
               <form onSubmit={handleResetPassword} className="p-6 space-y-4">
                 <div>
-                  <p className="text-xs text-slate-500">Admin Username</p>
+                  <p className="text-xs text-slate-500">Admin Email</p>
                   <p className="text-sm font-bold text-slate-900 dark:text-white font-mono mt-0.5">{resetModalAdmin.email}</p>
-                  {resetModalAdmin.name && (
-                    <p className="text-xs text-slate-400 mt-0.5">School: {resetModalAdmin.name}</p>
+                  {resetModalAdmin.college && (
+                    <p className="text-xs text-slate-400 mt-0.5">College: {resetModalAdmin.college.name}</p>
                   )}
                 </div>
 
@@ -943,18 +1457,10 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setResetModalAdmin(null)}
-                    className="btn btn-secondary btn-sm"
-                  >
+                  <button type="button" onClick={() => setResetModalAdmin(null)} className="btn btn-secondary btn-sm">
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    disabled={isResetting || !resetPassword.trim()}
-                    className="btn btn-primary btn-sm gap-1.5"
-                  >
+                  <button type="submit" disabled={isResetting || !resetPassword.trim()} className="btn btn-primary btn-sm gap-1.5">
                     {isResetting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                     <span>Update Password</span>
                   </button>
@@ -964,12 +1470,9 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {/* ── Modal: Confirm Delete ── */}
+        {/* ── Modal: Confirm Delete Admin ── */}
         {deleteModalAdmin && (
-          <div
-            className="modal-overlay"
-            onClick={e => { if (e.target === e.currentTarget) setDeleteModalAdmin(null); }}
-          >
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeleteModalAdmin(null); }}>
             <div className="modal-panel max-w-[420px]">
               <div className="p-6 space-y-4">
                 <div className="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400">
@@ -977,29 +1480,17 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <div className="text-center space-y-1">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Delete Admin Account?
-                  </h3>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Delete Admin Account?</h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Are you sure you want to permanently delete admin account <span className="font-semibold font-mono text-slate-800 dark:text-slate-200">{deleteModalAdmin.email}</span> ({deleteModalAdmin.name})?
-                    They will lose access to the question bank and reporting tools.
+                    Are you sure you want to permanently delete admin account <span className="font-semibold font-mono text-slate-800 dark:text-slate-200">{deleteModalAdmin.email}</span>?
                   </p>
                 </div>
 
                 <div className="flex items-center justify-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteModalAdmin(null)}
-                    className="btn btn-secondary btn-sm"
-                  >
+                  <button type="button" onClick={() => setDeleteModalAdmin(null)} className="btn btn-secondary btn-sm">
                     Cancel
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteAdmin}
-                    disabled={isDeleting}
-                    className="btn btn-destructive btn-sm gap-1.5"
-                  >
+                  <button type="button" onClick={handleDeleteAdmin} disabled={isDeleting} className="btn btn-destructive btn-sm gap-1.5">
                     {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                     <span>Confirm Delete</span>
                   </button>

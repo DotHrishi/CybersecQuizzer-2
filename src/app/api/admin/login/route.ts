@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
         id: admin.id,
         email: admin.email,
         name: admin.name,
+        collegeId: admin.collegeId,
+        collegeName: admin.college?.name,
       });
 
       return NextResponse.json({
@@ -57,6 +59,12 @@ export async function POST(req: NextRequest) {
           id: admin.id,
           email: admin.email,
           name: admin.name || admin.email,
+          collegeId: admin.collegeId,
+          college: admin.college ? {
+            id: admin.college.id,
+            name: admin.college.name,
+            identifier: admin.college.identifier,
+          } : null,
         },
         message: 'Admin authenticated successfully.',
       });
@@ -71,6 +79,8 @@ export async function POST(req: NextRequest) {
         id: -1,
         email: 'admin',
         name: 'Administrator',
+        collegeId: null,
+        collegeName: 'All Colleges (Legacy)',
       });
 
       return NextResponse.json({
@@ -80,6 +90,8 @@ export async function POST(req: NextRequest) {
           id: -1,
           email: 'admin',
           name: 'Administrator',
+          collegeId: null,
+          college: null,
         },
         message: 'Admin authenticated successfully.',
       });

@@ -1,6 +1,13 @@
 import { PrismaClient } from '@prisma/client';
+import { createHmac, randomBytes, scryptSync } from 'crypto';
 
 const prisma = new PrismaClient();
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
 
 const sampleQuestions = [
   {
@@ -204,7 +211,7 @@ const sampleQuestions = [
   {
     questionText: 'What is the key difference between a Computer Virus and a Computer Worm?',
     optionA: 'Viruses affect PCs while Worms affect Macs',
-    optionB: 'A virus requires a host file to execute, whereas a worm self-replicates independently over networks',
+    optionB: 'A virus requires a host file to execute, whereas a worm self-replicating independently over networks',
     optionC: 'Worms only infect emails',
     optionD: 'Viruses are legal security tools',
     correctOption: 'B',
@@ -226,17 +233,219 @@ const sampleQuestions = [
 ];
 
 async function main() {
-  console.log('Starting seed process...');
-  await prisma.question.deleteMany();
-  console.log('Cleared existing questions.');
+  console.log('--- Starting comprehensive seed process ---');
 
+  // 1. Seed Questions
+  console.log('Seeding question bank...');
   for (const q of sampleQuestions) {
-    await prisma.question.create({
-      data: q,
+    const existing = await prisma.question.findFirst({
+      where: { questionText: q.questionText },
     });
+    if (!existing) {
+      await prisma.question.create({ data: q });
+    }
   }
+  console.log(`Question bank ready (${sampleQuestions.length} questions).`);
 
-  console.log(`Successfully seeded ${sampleQuestions.length} cybersecurity questions.`);
+  // 2. Seed Dummy College & Configured Colleges
+  console.log('Seeding colleges...');
+  const dummyCollege = await prisma.college.upsert({
+    where: { identifier: 'DUMMY' },
+    update: { name: 'Enter-your-college' },
+    create: {
+      name: 'Enter-your-college',
+      identifier: 'DUMMY',
+    },
+  });
+
+  const mitCollege = await prisma.college.upsert({
+    where: { identifier: 'MITWPU' },
+    update: { name: 'MIT - WPU University Pune' },
+    create: {
+      name: 'MIT - WPU University Pune',
+      identifier: 'MITWPU',
+    },
+  });
+
+  const coepCollege = await prisma.college.upsert({
+    where: { identifier: 'COEP' },
+    update: { name: 'College of Engineering Pune' },
+    create: {
+      name: 'College of Engineering Pune',
+      identifier: 'COEP',
+    },
+  });
+
+  const sitCollege = await prisma.college.upsert({
+    where: { identifier: 'SIT' },
+    update: { name: 'Symbiosis Institute of Technology' },
+    create: {
+      name: 'Symbiosis Institute of Technology',
+      identifier: 'SIT',
+    },
+  });
+  console.log('Colleges seeded: Dummy, MIT-WPU, COEP, SIT.');
+
+  // 3. Seed Admins
+  console.log('Seeding admin accounts...');
+  // Super Admin
+  await prisma.adminUser.upsert({
+    where: { email: 'superadmin@cybersec.org' },
+    update: {
+      collegeId: null,
+      passwordHash: hashPassword('SuperAdmin@123'),
+      active: true,
+    },
+    create: {
+      email: 'superadmin@cybersec.org',
+      name: 'Chief Super Admin',
+      passwordHash: hashPassword('SuperAdmin@123'),
+      collegeId: null,
+      active: true,
+    },
+  });
+
+  // MIT School Admin
+  await prisma.adminUser.upsert({
+    where: { email: 'admin.mit@wpu.edu.in' },
+    update: {
+      collegeId: mitCollege.id,
+      passwordHash: hashPassword('AdminMit@123'),
+      active: true,
+    },
+    create: {
+      email: 'admin.mit@wpu.edu.in',
+      name: 'MIT Admin Officer',
+      passwordHash: hashPassword('AdminMit@123'),
+      collegeId: mitCollege.id,
+      active: true,
+    },
+  });
+
+  // COEP School Admin
+  await prisma.adminUser.upsert({
+    where: { email: 'admin.coep@coep.ac.in' },
+    update: {
+      collegeId: coepCollege.id,
+      passwordHash: hashPassword('AdminCoep@123'),
+      active: true,
+    },
+    create: {
+      email: 'admin.coep@coep.ac.in',
+      name: 'COEP Admin Officer',
+      passwordHash: hashPassword('AdminCoep@123'),
+      collegeId: coepCollege.id,
+      active: true,
+    },
+  });
+
+  // SIT School Admin
+  await prisma.adminUser.upsert({
+    where: { email: 'admin.sit@sitpune.edu.in' },
+    update: {
+      collegeId: sitCollege.id,
+      passwordHash: hashPassword('AdminSit@123'),
+      active: true,
+    },
+    create: {
+      email: 'admin.sit@sitpune.edu.in',
+      name: 'SIT Admin Officer',
+      passwordHash: hashPassword('AdminSit@123'),
+      collegeId: sitCollege.id,
+      active: true,
+    },
+  });
+  console.log('Admins seeded: Super Admin, MIT Admin, COEP Admin, SIT Admin.');
+
+  // 4. Seed Students
+  console.log('Seeding student profiles...');
+  // MIT Student
+  await prisma.userProfile.upsert({
+    where: { nickname: 'alex_mit' },
+    update: {
+      collegeId: mitCollege.id,
+      passwordHash: hashPassword('StudentMit@123'),
+    },
+    create: {
+      nickname: 'alex_mit',
+      fullName: 'Alex Mitchell',
+      email: 'alex.mit@wpu.edu.in',
+      collegeId: mitCollege.id,
+      passwordHash: hashPassword('StudentMit@123'),
+    },
+  });
+
+  // COEP Student
+  await prisma.userProfile.upsert({
+    where: { nickname: 'rachel_coep' },
+    update: {
+      collegeId: coepCollege.id,
+      passwordHash: hashPassword('StudentCoep@123'),
+    },
+    create: {
+      nickname: 'rachel_coep',
+      fullName: 'Rachel COEP',
+      email: 'rachel.coep@coep.ac.in',
+      collegeId: coepCollege.id,
+      passwordHash: hashPassword('StudentCoep@123'),
+    },
+  });
+
+  // Dummy College Student (within grace period)
+  await prisma.userProfile.upsert({
+    where: { nickname: 'new_student_grace' },
+    update: {
+      collegeId: dummyCollege.id,
+      passwordHash: null,
+    },
+    create: {
+      nickname: 'new_student_grace',
+      fullName: 'Grace Period Student',
+      email: 'grace.student@example.com',
+      collegeId: dummyCollege.id,
+      passwordHash: null,
+      createdAt: new Date(), // Just created, well within 5 days
+    },
+  });
+
+  // Seed sample attempts for students
+  await prisma.userAttempt.deleteMany();
+  await prisma.userAttempt.createMany({
+    data: [
+      {
+        userName: 'alex_mit',
+        quizDate: new Date().toISOString().split('T')[0],
+        isCorrect: true,
+        score: 1,
+        bonusPoints: 10,
+        totalPoints: 11,
+        responseTimeMs: 2400,
+        category: 'Social Engineering',
+      },
+      {
+        userName: 'alex_mit',
+        quizDate: '2026-08-18',
+        isCorrect: true,
+        score: 1,
+        bonusPoints: 8,
+        totalPoints: 9,
+        responseTimeMs: 3100,
+        category: 'Cryptography',
+      },
+      {
+        userName: 'rachel_coep',
+        quizDate: new Date().toISOString().split('T')[0],
+        isCorrect: true,
+        score: 1,
+        bonusPoints: 10,
+        totalPoints: 11,
+        responseTimeMs: 1900,
+        category: 'Network Security',
+      },
+    ],
+  });
+
+  console.log('--- Seed process completed successfully! ---');
 }
 
 main()

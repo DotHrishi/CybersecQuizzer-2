@@ -1,3 +1,11 @@
+export interface CollegeDTO {
+  id: number;
+  name: string;
+  identifier: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface UserProfileDTO {
   id?: number;
   fullName: string;
@@ -5,6 +13,14 @@ export interface UserProfileDTO {
   isNicknameSame: boolean;
   email: string;
   emailType: 'college' | 'personal';
+  collegeId: number;
+  college?: CollegeDTO;
+  hasPassword?: boolean;
+  isBeyondGracePeriod?: boolean;
+  daysRemaining?: number;
+  hoursRemaining?: number;
+  requiresCollegeUpdate?: boolean;
+  requiresPassword?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -15,6 +31,8 @@ export interface UserProfileFormValues {
   isNicknameSame: boolean;
   email: string;
   emailType: 'college' | 'personal';
+  collegeName: string;
+  password?: string;
 }
 
 export interface UserBadgeInfo {
@@ -29,4 +47,5 @@ export interface UserBadgeInfo {
   category?: string;
   badgeType?: 'milestone' | 'topic';
 }
+
 

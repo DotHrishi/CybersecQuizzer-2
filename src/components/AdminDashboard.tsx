@@ -12,7 +12,7 @@ import {
   Trophy, Clock, Target, TrendingUp, Hash, ChevronsUpDown, Award,
   ShieldAlert, Layers, CalendarDays, Flame,
   AlertOctagon, CheckCircle, XCircle, TrendingDown,
-  Mail, LogOut, Key, User,
+  Mail, LogOut, Key, User, Building2, Check, Copy,
 } from 'lucide-react';
 
 
@@ -673,10 +673,17 @@ function OverviewReport({ stats, questions, leaderboard }: { stats: Stats; quest
 }
 
 /* ── 2. Student Performance report ── */
-function StudentReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
+function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEntry[]; adminToken?: string | null }) {
   const [search, setSearch]   = useState('');
   const [sortKey, setSortKey] = useState<string>('totalPoints');
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('desc');
+
+  /* Student Password Reset Modal */
+  const [resetModalStudent, setResetModalStudent] = useState<string | null>(null);
+  const [customPassword, setCustomPassword] = useState('');
+  const [isResettingStudent, setIsResettingStudent] = useState(false);
+  const [resetSuccessData, setResetSuccessData] = useState<{ nickname: string; temporaryPassword: string } | null>(null);
+  const [copiedPwd, setCopiedPwd] = useState(false);
 
   const handleSort = (k: string) => {
     if (sortKey === k) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -700,14 +707,19 @@ function StudentReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
       return sortDir === 'asc' ? av - bv : bv - av;
     });
 
-  const th = (label: string, key: string, align = '') => (
-    <SortTh label={label} sortKey={key} activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} align={align} />
-  );
-
   const handleExportCSV = () => {
-    exportCSV('student_performance.csv',
-      filtered.map(u => [u.userName, String(u.attempts), String(u.correctAnswers), u.totalPoints.toFixed(2), String(u.rank), (u.avgResponseTimeMs/1000).toFixed(2)+'s', new Date(u.lastAttemptDate).toLocaleDateString()]),
-      ['Student','Attempts','Correct','Total Points','Rank','Avg Speed','Last Attempt']
+    exportCSV('students_report.csv',
+      filtered.map(u => [
+        u.userName,
+        String(u.attempts),
+        String(u.correctAnswers),
+        `${u.attempts ? Math.round((u.correctAnswers / u.attempts) * 100) : 0}%`,
+        u.totalPoints.toFixed(2),
+        String(u.rank),
+        (u.avgResponseTimeMs / 1000).toFixed(2),
+        new Date(u.lastAttemptDate).toISOString().split('T')[0],
+      ]),
+      ['Student', 'Attempts', 'Correct', 'Accuracy', 'Total Points', 'Rank', 'Avg Speed (s)', 'Last Attempt']
     );
     toast.success('Student report exported.');
   };
@@ -717,13 +729,54 @@ function StudentReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
     exportPDF('Student Performance Report', `<h1>Student Performance Report</h1><p class="sub">Generated: ${new Date().toLocaleString()}</p><table><thead><tr><th>Student</th><th>Attempts</th><th>Correct</th><th>Total Points</th><th>Rank</th><th>Avg Speed</th><th>Last Attempt</th></tr></thead><tbody>${rows}</tbody></table>`);
   };
 
+  const handleResetStudentPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetModalStudent) return;
+
+    setIsResettingStudent(true);
+    try {
+      const res = await fetch('/api/admin/students', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': adminToken || '',
+          'x-admin-password': adminToken || '',
+        },
+        body: JSON.stringify({
+          nickname: resetModalStudent,
+          newPassword: customPassword.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setResetSuccessData({
+          nickname: data.nickname,
+          temporaryPassword: data.temporaryPassword,
+        });
+        setResetModalStudent(null);
+        setCustomPassword('');
+        toast.success(`Password reset for ${data.nickname}!`);
+      } else {
+        toast.error(data.message || 'Failed to reset password.');
+      }
+    } catch {
+      toast.error('Network error resetting student password.');
+    } finally {
+      setIsResettingStudent(false);
+    }
+  };
+
+  const th = (label: string, key: string, align = '') => (
+    <SortTh label={label} sortKey={key} activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} align={align} />
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">Student Performance</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Per-student attempts, scores, rank, and speed — all time.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Per-student attempts, scores, rank, speed, and credential management.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleExportCSV} className="btn btn-secondary btn-xs gap-1.5"><FileText className="w-3 h-3" />CSV</button>
@@ -749,11 +802,12 @@ function StudentReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
                 {th('Avg Speed', 'avgResponseTimeMs', 'text-right')}
                 {th('Last Attempt', 'lastDate', 'text-right')}
                 <th className="table-th text-center">Certificate</th>
+                <th className="table-th text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={9}><div className="empty-state py-10"><div className="empty-state-icon"><Users className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No students found</p></div></td></tr>
+                ? <tr><td colSpan={10}><div className="empty-state py-10"><div className="empty-state-icon"><Users className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No students found</p></div></td></tr>
                 : filtered.map(u => {
                   const accuracy = u.attempts ? Math.round((u.correctAnswers / u.attempts) * 100) : 0;
                   return (
@@ -785,6 +839,18 @@ function StudentReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
                         >
                           <Award className="w-3.5 h-3.5 shrink-0" />
                           Certificate
+                        </button>
+                      </td>
+                      <td className="table-td text-right">
+                        <button
+                          onClick={() => {
+                            setResetModalStudent(u.userName);
+                            setCustomPassword('');
+                          }}
+                          title={`Reset password for student ${u.userName}`}
+                          className="btn-icon text-slate-500 hover:text-amber-600 dark:hover:text-amber-400"
+                        >
+                          <Key className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     </tr>
@@ -1683,10 +1749,12 @@ function TrendReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; 
 ═══════════════════════════════════════════════════════════ */
 const ADMIN_STORAGE_KEY = 'cybersec_admin_token';
 const ADMIN_USER_STORAGE_KEY = 'cybersec_admin_email';
+const ADMIN_COLLEGE_STORAGE_KEY = 'cybersec_admin_college';
 
 export default function AdminDashboard() {
   const [adminToken, setAdminToken]       = useState<string | null>(null);
   const [adminEmail, setAdminEmail]       = useState<string | null>(null);
+  const [adminCollege, setAdminCollege]   = useState<{ id: number; name: string; identifier: string } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [questions, setQuestions]         = useState<Question[]>([]);
   const [stats, setStats]                 = useState<Stats | null>(null);
@@ -1740,9 +1808,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     const savedToken = sessionStorage.getItem(ADMIN_STORAGE_KEY);
     const savedEmail = sessionStorage.getItem(ADMIN_USER_STORAGE_KEY);
+    const savedCol   = sessionStorage.getItem(ADMIN_COLLEGE_STORAGE_KEY);
     if (savedToken) {
       setAdminToken(savedToken);
       if (savedEmail) setAdminEmail(savedEmail);
+      if (savedCol) {
+        try { setAdminCollege(JSON.parse(savedCol)); } catch { /* silent */ }
+      }
       fetchAdminData(savedToken);
     }
   }, []);
@@ -1759,13 +1831,14 @@ export default function AdminDashboard() {
       const [qRes, sRes, lRes] = await Promise.all([
         fetch('/api/admin/questions', { headers: authHeaders }),
         fetch('/api/admin/stats',     { headers: authHeaders }),
-        fetch('/api/leaderboard?period=all-time'),
+        fetch('/api/leaderboard?period=all-time', { headers: authHeaders }),
       ]);
 
       if (qRes.status === 401) {
         toast.error('Session expired. Please log in again.');
         sessionStorage.removeItem(ADMIN_STORAGE_KEY);
         sessionStorage.removeItem(ADMIN_USER_STORAGE_KEY);
+        sessionStorage.removeItem(ADMIN_COLLEGE_STORAGE_KEY);
         setAdminToken(null);
         setIsAuthenticated(false);
         return;
@@ -1775,6 +1848,10 @@ export default function AdminDashboard() {
       if (qData.success && sData.success) {
         setQuestions(qData.questions || []);
         setStats(sData.stats);
+        if (sData.college) {
+          setAdminCollege(sData.college);
+          sessionStorage.setItem(ADMIN_COLLEGE_STORAGE_KEY, JSON.stringify(sData.college));
+        }
         setLeaderboard(lData.leaderboard || []);
         setIsAuthenticated(true);
       } else {
@@ -1804,6 +1881,10 @@ export default function AdminDashboard() {
           sessionStorage.setItem(ADMIN_USER_STORAGE_KEY, data.admin.email);
           setAdminEmail(data.admin.email);
         }
+        if (data.admin?.college) {
+          sessionStorage.setItem(ADMIN_COLLEGE_STORAGE_KEY, JSON.stringify(data.admin.college));
+          setAdminCollege(data.admin.college);
+        }
         setAdminToken(data.token);
         setIsAuthenticated(true);
         fetchAdminData(data.token);
@@ -1820,11 +1901,14 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     sessionStorage.removeItem(ADMIN_STORAGE_KEY);
     sessionStorage.removeItem(ADMIN_USER_STORAGE_KEY);
+    sessionStorage.removeItem(ADMIN_COLLEGE_STORAGE_KEY);
     setAdminToken(null);
     setAdminEmail(null);
+    setAdminCollege(null);
     setIsAuthenticated(false);
     toast.success('Admin logged out.');
   };
+
 
   if (!isAuthenticated) return <LoginScreen onLogin={handleLogin} isLoading={isLoading} />;
 
@@ -2042,7 +2126,7 @@ export default function AdminDashboard() {
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="page-title">Admin Panel</h1>
               {adminEmail && (
                 <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
@@ -2050,8 +2134,14 @@ export default function AdminDashboard() {
                   {adminEmail}
                 </span>
               )}
+              {adminCollege && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                  <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  {adminCollege.name}
+                </span>
+              )}
             </div>
-            <p className="page-subtitle">Manage questions, monitor activity, and view programme reports.</p>
+            <p className="page-subtitle">Manage questions, monitor activity, and view institution-scoped reports.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {adminTab === 'questions' && (
@@ -2098,15 +2188,27 @@ export default function AdminDashboard() {
       )}
 
       {/* Main tabs */}
-      <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-900/90 p-1 rounded-xl border border-slate-200 dark:border-slate-800 w-fit">
-        {([
-          { id: 'questions', label: 'Question Bank', icon: BookOpen },
-          { id: 'reports',   label: 'Reports',       icon: BarChart3 },
-        ] as { id: AdminTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setAdminTab(id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${adminTab === id ? 'bg-[#0f172a] text-white dark:bg-white dark:text-black shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'}`}>
-            <Icon className="w-3.5 h-3.5" />{label}
-          </button>
-        ))}
+      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
+        <button
+          onClick={() => setAdminTab('questions')}
+          className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            adminTab === 'questions'
+              ? 'border-[#0f172a] text-[#0f172a] dark:border-white dark:text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          Question Bank ({questions.length})
+        </button>
+        <button
+          onClick={() => setAdminTab('reports')}
+          className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            adminTab === 'reports'
+              ? 'border-[#0f172a] text-[#0f172a] dark:border-white dark:text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          Analytics &amp; Reports
+        </button>
       </div>
 
       {/* ════════════════════════════════
@@ -2114,38 +2216,36 @@ export default function AdminDashboard() {
       ════════════════════════════════ */}
       {adminTab === 'questions' && (
         <>
-          {/* Saved views */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">Views:</span>
-            {SAVED_VIEWS.map(v => (
-              <button key={v.id} onClick={() => applyView(v)} className={`filter-chip ${activeView === v.id ? 'filter-chip-active' : ''}`}>{v.label}</button>
-            ))}
-          </div>
-
-          {/* Filter bar */}
           <div className="card overflow-hidden">
-            <div className="flex flex-wrap items-center gap-2 p-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="search-wrap flex-1 min-w-[200px]">
-                <Search className="search-icon" />
-                <input type="text" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setActiveView(''); }} placeholder="Search questions..." className="search-input" />
-                {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 btn-icon w-5 h-5"><X className="w-3.5 h-3.5" /></button>}
-              </div>
-              <select value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setActiveView(''); }} className="field-input w-auto py-2 text-xs">
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <div className="hidden sm:flex items-center gap-1">
-                {(['All','Easy','Medium','Hard'] as FilterDifficulty[]).map(d => (
-                  <button key={d} onClick={() => { setFilterDifficulty(d); setActiveView(''); }} className={`filter-chip ${filterDifficulty === d ? 'filter-chip-active' : ''}`}>{d}</button>
-                ))}
-              </div>
-              <div className="hidden sm:flex items-center gap-1">
-                {(['All','Active','Disabled'] as FilterStatus[]).map(s => (
-                  <button key={s} onClick={() => { setFilterStatus(s); setActiveView(''); }} className={`filter-chip ${filterStatus === s ? 'filter-chip-active' : ''}`}>{s}</button>
-                ))}
-              </div>
-              <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-                <strong className="text-slate-900 dark:text-white">{filtered.length}</strong> / {questions.length}
-                {activeFilterCount > 0 && <button onClick={() => { setSearchTerm(''); setFilterCategory('All'); setFilterDifficulty('All'); setFilterStatus('All'); setActiveView('all'); }} className="btn btn-ghost btn-xs gap-1"><X className="w-3 h-3" />Clear</button>}
+            {/* Filter toolbar */}
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-3 bg-slate-50/50 dark:bg-slate-800/20">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    placeholder="Search question text or options..."
+                    className="field-input pl-9 text-xs"
+                  />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 btn-icon w-5 h-5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="field-input text-xs w-auto">
+                    {categories.map(c => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
+                  </select>
+                  <select value={filterDifficulty} onChange={e => setFilterDifficulty(e.target.value as FilterDifficulty)} className="field-input text-xs w-auto">
+                    {(['All', 'Easy', 'Medium', 'Hard'] as FilterDifficulty[]).map(d => <option key={d} value={d}>{d === 'All' ? 'All Difficulties' : d}</option>)}
+                  </select>
+                  <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as FilterStatus)} className="field-input text-xs w-auto">
+                    {(['All', 'Active', 'Disabled'] as FilterStatus[]).map(s => <option key={s} value={s}>{s === 'All' ? 'All Status' : s}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -2231,12 +2331,6 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
-            {!isLoading && filtered.length > 0 && (
-              <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-                <span>Showing <strong className="text-slate-900 dark:text-white">{filtered.length}</strong> of <strong className="text-slate-900 dark:text-white">{questions.length}</strong></span>
-                <span className="text-[11px] text-slate-400">{selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Click checkbox to select'}</span>
-              </div>
-            )}
           </div>
         </>
       )}
@@ -2268,7 +2362,7 @@ export default function AdminDashboard() {
           {stats && (
             <>
               {reportTab === 'overview'   && <OverviewReport    stats={stats}   questions={questions} leaderboard={leaderboard} />}
-              {reportTab === 'students'   && <StudentReport     leaderboard={leaderboard} />}
+              {reportTab === 'students'   && <StudentReport     leaderboard={leaderboard} adminToken={adminToken} />}
               {reportTab === 'attempts'   && <AttemptsReport    leaderboard={leaderboard} />}
               {reportTab === 'qbank'      && <QuestionBankReport questions={questions} />}
               {reportTab === 'risk'       && <RiskReport        leaderboard={leaderboard} stats={stats} />}

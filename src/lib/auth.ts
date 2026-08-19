@@ -36,6 +36,8 @@ export interface AdminTokenPayload {
   id: number;
   email: string;
   name?: string | null;
+  collegeId: number | null;
+  collegeName?: string | null;
   role: 'admin';
   exp: number; // Unix ms
 }
@@ -45,11 +47,19 @@ export interface SuperAdminTokenPayload {
   exp: number; // Unix ms
 }
 
-export function signAdminToken(admin: { id: number; email: string; name?: string | null }): string {
+export function signAdminToken(admin: {
+  id: number;
+  email: string;
+  name?: string | null;
+  collegeId?: number | null;
+  collegeName?: string | null;
+}): string {
   const payload: AdminTokenPayload = {
     id: admin.id,
     email: admin.email,
     name: admin.name || null,
+    collegeId: admin.collegeId ?? null,
+    collegeName: admin.collegeName || null,
     role: 'admin',
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
   };
@@ -133,9 +143,18 @@ export function verifySuperAdminRequest(req: NextRequest): boolean {
 }
 
 export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: boolean; admin?: any }> {
-  // 1. Super Admin is always authorized for admin actions
+  // 1. Super Admin is always authorized for admin actions (unrestricted access)
   if (verifySuperAdminRequest(req)) {
-    return { isAuth: true, admin: { id: 0, email: 'superadmin@system', name: 'Super Admin' } };
+    return {
+      isAuth: true,
+      admin: {
+        id: 0,
+        email: 'superadmin@system',
+        name: 'Super Admin',
+        isSuperAdmin: true,
+        collegeId: null,
+      },
+    };
   }
 
   // 2. Token-based Admin authentication
@@ -143,13 +162,32 @@ export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: bo
   if (token) {
     const payload = verifyAdminToken(token);
     if (payload) {
-      // Optional check if admin is active in database
+      // Check if admin is active in database and fetch fresh college association
       const admin = await dataService.getAdminById(payload.id);
       if (admin && admin.active) {
-        return { isAuth: true, admin };
+        return {
+          isAuth: true,
+          admin: {
+            id: admin.id,
+            email: admin.email,
+            name: admin.name,
+            collegeId: admin.collegeId,
+            college: admin.college,
+            isSuperAdmin: false,
+          },
+        };
       } else if (!admin) {
-        // If token is valid and signed, allow fallback
-        return { isAuth: true, admin: payload };
+        // Fallback to token payload if DB lookup returns null
+        return {
+          isAuth: true,
+          admin: {
+            id: payload.id,
+            email: payload.email,
+            name: payload.name,
+            collegeId: payload.collegeId,
+            isSuperAdmin: false,
+          },
+        };
       }
     }
   }
@@ -157,8 +195,18 @@ export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: bo
   // 3. Direct admin password (legacy / fallback)
   const passwordHeader = req.headers.get('x-admin-password')?.trim();
   if (passwordHeader && passwordHeader === LEGACY_ADMIN_PASSWORD) {
-    return { isAuth: true, admin: { id: -1, email: 'admin@legacy', name: 'Legacy Admin' } };
+    return {
+      isAuth: true,
+      admin: {
+        id: -1,
+        email: 'admin@legacy',
+        name: 'Legacy Admin',
+        collegeId: null,
+        isSuperAdmin: false,
+      },
+    };
   }
 
   return { isAuth: false };
 }
+

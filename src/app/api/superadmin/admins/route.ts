@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifySuperAdminRequest, hashPassword } from '@/lib/auth';
 import { dataService } from '@/lib/dataService';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { AdminCreateSchema } from '@/lib/validation';
 
 // GET: Fetch all admin credentials
 export async function GET(req: NextRequest) {
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST: Add new admin account
+// POST: Add new admin account associated with a college
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
   const rl = checkRateLimit(`superadmin_admins:${ip}`, 30);
@@ -38,41 +39,36 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { email, username, password, name, active } = body;
+    const validation = AdminCreateSchema.safeParse(body);
 
-    // Validate identifier (username or email)
-    const rawIdentifier = (username || email || '').trim();
-    if (!rawIdentifier || typeof rawIdentifier !== 'string' || rawIdentifier.length < 3) {
+    if (!validation.success) {
       return NextResponse.json(
-        { success: false, message: 'Valid username or email address (at least 3 characters) is required.' },
-        { status: 400 }
-      );
-    }
-    const cleanIdentifier = rawIdentifier.toLowerCase();
-
-    // Validate School Name (compulsory)
-    const schoolName = typeof name === 'string' ? name.trim() : '';
-    if (!schoolName) {
-      return NextResponse.json(
-        { success: false, message: 'School Name is required.' },
+        {
+          success: false,
+          message: validation.error.errors[0]?.message || 'Validation error',
+          errors: validation.error.errors,
+        },
         { status: 400 }
       );
     }
 
-    // Validate password
-    if (!password || typeof password !== 'string' || password.length < 6) {
+    const { email, password, name, collegeId, active } = validation.data;
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Verify college exists
+    const college = await dataService.getCollegeById(collegeId);
+    if (!college) {
       return NextResponse.json(
-        { success: false, message: 'Password must be at least 6 characters long.' },
+        { success: false, message: 'The selected college does not exist.' },
         { status: 400 }
       );
     }
 
-
-    // Check if username/email already registered
-    const existing = await dataService.getAdminByEmail(cleanIdentifier);
+    // Check if email already registered
+    const existing = await dataService.getAdminByEmail(cleanEmail);
     if (existing) {
       return NextResponse.json(
-        { success: false, message: `An admin account for "${cleanIdentifier}" already exists.` },
+        { success: false, message: `An admin account for "${cleanEmail}" already exists.` },
         { status: 409 }
       );
     }
@@ -80,15 +76,16 @@ export async function POST(req: NextRequest) {
     // Hash password and store
     const passwordHash = hashPassword(password);
     const newAdmin = await dataService.createAdmin({
-      email: cleanIdentifier,
+      email: cleanEmail,
       passwordHash,
-      name: typeof name === 'string' ? name.trim() : undefined,
-      active: active !== undefined ? Boolean(active) : true,
+      name: name?.trim() || undefined,
+      collegeId: college.id,
+      active: active ?? true,
     });
 
     return NextResponse.json({
       success: true,
-      message: `Admin account for "${cleanIdentifier}" created successfully.`,
+      message: `Admin account for "${cleanEmail}" created successfully and assigned to ${college.name}.`,
       admin: newAdmin,
     });
 
@@ -100,7 +97,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT: Update admin account status, name, or password
+// PUT: Update admin account status, name, college, or password
 export async function PUT(req: NextRequest) {
   if (!verifySuperAdminRequest(req)) {
     return NextResponse.json(
@@ -111,7 +108,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, active, name, password } = body;
+    const { id, active, name, password, collegeId } = body;
 
     const adminId = Number(id);
     if (!adminId || isNaN(adminId)) {
@@ -121,13 +118,24 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const updatePayload: { name?: string; active?: boolean; passwordHash?: string } = {};
+    const updatePayload: { name?: string; active?: boolean; passwordHash?: string; collegeId?: number } = {};
 
     if (active !== undefined) {
       updatePayload.active = Boolean(active);
     }
     if (name !== undefined) {
       updatePayload.name = String(name).trim();
+    }
+    if (collegeId !== undefined) {
+      const colId = Number(collegeId);
+      const col = await dataService.getCollegeById(colId);
+      if (!col) {
+        return NextResponse.json(
+          { success: false, message: 'Selected college not found.' },
+          { status: 400 }
+        );
+      }
+      updatePayload.collegeId = col.id;
     }
     if (password) {
       if (typeof password !== 'string' || password.length < 6) {
@@ -193,3 +201,4 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
+

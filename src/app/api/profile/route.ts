@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dataService } from '@/lib/dataService';
 import { ProfileSchema } from '@/lib/validation';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import {
+  isDummyCollege,
+  getStudentGracePeriodStatus,
+  validateStudentPassword,
+  DUMMY_COLLEGE_NAME,
+} from '@/lib/collegeNormalization';
+import { hashPassword } from '@/lib/auth';
 
 const QUIZ_TOPICS = [
   'General Security',
@@ -51,6 +58,13 @@ export async function GET(req: NextRequest) {
     );
     const totalSolved = attempts.length;
     const correctCount = attempts.filter((a: any) => a.isCorrect).length;
+
+    // Grace period calculations
+    const graceStatus = getStudentGracePeriodStatus(profile?.createdAt);
+    const hasDummy = isDummyCollege(profile?.college?.name);
+    const hasPassword = Boolean(profile?.passwordHash);
+    const requiresCollegeUpdate = graceStatus.isBeyondGracePeriod && hasDummy;
+    const requiresPassword = graceStatus.isBeyondGracePeriod && !hasPassword;
 
     // Calculate 7-day consecutive streak
     const uniqueDates = Array.from(
@@ -150,9 +164,35 @@ export async function GET(req: NextRequest) {
 
     const unlockedTopicCount = topicBadges.filter((b) => b.isUnlocked).length;
 
+    const safeProfile = profile ? {
+      id: profile.id,
+      fullName: profile.fullName,
+      nickname: profile.nickname,
+      isNicknameSame: profile.isNicknameSame,
+      email: profile.email,
+      emailType: profile.emailType,
+      collegeId: profile.collegeId,
+      college: profile.college ? {
+        id: profile.college.id,
+        name: profile.college.name,
+        identifier: profile.college.identifier,
+      } : null,
+      hasPassword,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    } : null;
+
     return NextResponse.json({
       success: true,
-      profile: profile || null,
+      profile: safeProfile,
+      gracePeriod: {
+        isBeyondGracePeriod: graceStatus.isBeyondGracePeriod,
+        daysRemaining: graceStatus.daysRemaining,
+        hoursRemaining: graceStatus.hoursRemaining,
+        requiresCollegeUpdate,
+        requiresPassword,
+        hasDummyCollege: hasDummy,
+      },
       stats: {
         totalSolved,
         correctCount,
@@ -176,8 +216,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-
-
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
   const rl = checkRateLimit(ip, 30);
@@ -199,13 +237,140 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const profileData = validation.data;
-    const savedProfile = await dataService.upsertUserProfile(profileData);
+    const { fullName, nickname, isNicknameSame, email, emailType, collegeName, password } = validation.data;
+    const cleanNickname = (isNicknameSame ? fullName : nickname).trim();
+
+    // Check existing profile to evaluate grace period and existing password
+    const existingProfile = await dataService.getUserProfile(cleanNickname);
+    const graceStatus = getStudentGracePeriodStatus(existingProfile?.createdAt);
+
+    let targetCollegeId: number | undefined = undefined;
+    const rawCollegeInput = (collegeName || '').trim();
+
+    if (rawCollegeInput) {
+      if (isDummyCollege(rawCollegeInput)) {
+        if (graceStatus.isBeyondGracePeriod) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'COLLEGE_REQUIRED',
+              message: 'Your college/school information is required to continue. Please enter the exact name provided by your college administrator.',
+            },
+            { status: 400 }
+          );
+        }
+        const dummy = await dataService.getOrCreateDummyCollege();
+        targetCollegeId = dummy.id;
+      } else {
+        // Find matching college with exact normalized match
+        const matchedCollege = await dataService.findCollegeByName(rawCollegeInput);
+        if (!matchedCollege) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'COLLEGE_NOT_FOUND',
+              message: 'Please enter the exact college/school name provided by your college administrator. The name must match exactly.',
+            },
+            { status: 400 }
+          );
+        }
+        targetCollegeId = matchedCollege.id;
+      }
+    } else {
+      // If collegeName not provided
+      if (existingProfile?.collegeId) {
+        // Retain existing college
+        if (graceStatus.isBeyondGracePeriod && isDummyCollege(existingProfile.college?.name)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'COLLEGE_REQUIRED',
+              message: 'Your college/school information is required to continue. Please enter the exact name provided by your college administrator.',
+            },
+            { status: 400 }
+          );
+        }
+        targetCollegeId = existingProfile.collegeId;
+      } else {
+        if (graceStatus.isBeyondGracePeriod) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'COLLEGE_REQUIRED',
+              message: 'Your college/school information is required to continue. Please enter the exact name provided by your college administrator.',
+            },
+            { status: 400 }
+          );
+        }
+        const dummy = await dataService.getOrCreateDummyCollege();
+        targetCollegeId = dummy.id;
+      }
+    }
+
+    // Password Validation & Hashing
+    let passwordHash: string | undefined = undefined;
+    if (password && password.trim()) {
+      const pwdValidation = validateStudentPassword(password.trim());
+      if (!pwdValidation.isValid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'INVALID_PASSWORD',
+            message: pwdValidation.message || 'Password does not meet requirements.',
+          },
+          { status: 400 }
+        );
+      }
+      passwordHash = hashPassword(password.trim());
+    } else {
+      // If password not provided
+      if (graceStatus.isBeyondGracePeriod && !existingProfile?.passwordHash) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'PASSWORD_REQUIRED',
+            message: 'A password is required to continue after the 5-day grace period. (Min 8 chars, at least 1 uppercase, 1 lowercase, 1 number).',
+          },
+          { status: 400 }
+        );
+      }
+      if (existingProfile?.passwordHash) {
+        passwordHash = existingProfile.passwordHash;
+      }
+    }
+
+    const savedProfile = await dataService.upsertUserProfile({
+      fullName,
+      nickname: cleanNickname,
+      isNicknameSame,
+      email,
+      emailType,
+      collegeId: targetCollegeId,
+      passwordHash,
+    });
+
+    const safeProfile = {
+      id: savedProfile.id,
+      fullName: savedProfile.fullName,
+      nickname: savedProfile.nickname,
+      isNicknameSame: savedProfile.isNicknameSame,
+      email: savedProfile.email,
+      emailType: savedProfile.emailType,
+      collegeId: savedProfile.collegeId,
+      college: savedProfile.college ? {
+        id: savedProfile.college.id,
+        name: savedProfile.college.name,
+        identifier: savedProfile.college.identifier,
+      } : null,
+      hasPassword: Boolean(savedProfile.passwordHash),
+      createdAt: savedProfile.createdAt,
+      updatedAt: savedProfile.updatedAt,
+    };
 
     return NextResponse.json({
       success: true,
       message: 'Profile saved successfully!',
-      profile: savedProfile,
+      profile: safeProfile,
     });
   } catch (error: any) {
     console.error('Error saving user profile:', error);
@@ -215,3 +380,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
