@@ -2,20 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dataService } from '@/lib/dataService';
 import { QuestionSchema } from '@/lib/validation';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
-
-function verifyAdminAuth(req: NextRequest): boolean {
-  const adminHeader = req.headers.get('x-admin-password')?.trim();
-  const expectedPassword = (process.env.ADMIN_PASSWORD || 'cyberadmin123').trim();
-  return Boolean(adminHeader && adminHeader === expectedPassword);
-}
+import { verifyAdminRequest } from '@/lib/auth';
 
 // GET: Fetch questions
 export async function GET(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
-  const rl = checkRateLimit(ip, 30);
+  const rl = checkRateLimit(ip, 60);
   if (!rl.isAllowed) return rateLimitResponse();
 
-  if (!verifyAdminAuth(req)) {
+  const { isAuth } = await verifyAdminRequest(req);
+  if (!isAuth) {
     return NextResponse.json({ success: false, message: 'Unauthorized admin request.' }, { status: 401 });
   }
 
@@ -29,7 +25,8 @@ export async function GET(req: NextRequest) {
 
 // POST: Add single question or bulk import
 export async function POST(req: NextRequest) {
-  if (!verifyAdminAuth(req)) {
+  const { isAuth } = await verifyAdminRequest(req);
+  if (!isAuth) {
     return NextResponse.json({ success: false, message: 'Unauthorized admin request.' }, { status: 401 });
   }
 
@@ -67,7 +64,8 @@ export async function POST(req: NextRequest) {
 
 // PUT: Edit / Update question or toggle active status
 export async function PUT(req: NextRequest) {
-  if (!verifyAdminAuth(req)) {
+  const { isAuth } = await verifyAdminRequest(req);
+  if (!isAuth) {
     return NextResponse.json({ success: false, message: 'Unauthorized admin request.' }, { status: 401 });
   }
 
@@ -88,7 +86,8 @@ export async function PUT(req: NextRequest) {
 
 // DELETE: Delete single question
 export async function DELETE(req: NextRequest) {
-  if (!verifyAdminAuth(req)) {
+  const { isAuth } = await verifyAdminRequest(req);
+  if (!isAuth) {
     return NextResponse.json({ success: false, message: 'Unauthorized admin request.' }, { status: 401 });
   }
 

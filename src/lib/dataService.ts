@@ -428,6 +428,202 @@ export const dataService = {
       console.error('Prisma upsertUserProfile fallback failed:', dbErr);
       throw dbErr;
     }
+  },
+
+  /* ─── Admin Users Management (Super Admin & Admin Auth) ─── */
+  async getAdminByEmail(email: string) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('admin_users')
+          .select('*')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+
+        if (!error && data) return data;
+        if (error && !error.message.includes('schema cache')) {
+          console.error('Supabase getAdminByEmail error:', error);
+        }
+      } catch (err) {
+        console.warn('Supabase getAdminByEmail failed:', err);
+      }
+    }
+
+    try {
+      return await db.adminUser.findFirst({
+        where: { email: { equals: cleanEmail } },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getAdminByEmail fallback failed:', dbErr);
+      return null;
+    }
+  },
+
+  async getAdminById(id: number) {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('admin_users')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+
+        if (!error && data) return data;
+      } catch (err) {
+        console.warn('Supabase getAdminById failed:', err);
+      }
+    }
+
+    try {
+      return await db.adminUser.findUnique({
+        where: { id },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getAdminById fallback failed:', dbErr);
+      return null;
+    }
+  },
+
+  async getAllAdmins() {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('admin_users')
+          .select('id, email, name, active, createdAt, updatedAt')
+          .order('createdAt', { ascending: false });
+
+        if (!error && data) return data;
+        if (error && !error.message.includes('schema cache')) {
+          console.error('Supabase getAllAdmins error:', error);
+        }
+      } catch (err) {
+        console.warn('Supabase getAllAdmins failed:', err);
+      }
+    }
+
+    try {
+      return await db.adminUser.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          active: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getAllAdmins fallback failed:', dbErr);
+      return [];
+    }
+  },
+
+  async createAdmin(data: { email: string; passwordHash: string; name?: string; active?: boolean }) {
+    const payload = {
+      email: data.email.trim().toLowerCase(),
+      passwordHash: data.passwordHash,
+      name: data.name?.trim() || null,
+      active: data.active ?? true,
+    };
+
+    if (isSupabaseConfigured) {
+      const { data: record, error } = await supabase
+        .from('admin_users')
+        .insert(payload)
+        .select('id, email, name, active, createdAt, updatedAt')
+        .single();
+
+      if (!error && record) return record;
+      if (error) {
+        console.error('Supabase createAdmin error:', error);
+        throw new Error(error.message);
+      }
+    }
+
+    try {
+      return await db.adminUser.create({
+        data: payload,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          active: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (dbErr) {
+      console.error('Prisma createAdmin fallback failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  async updateAdmin(id: number, data: { name?: string; active?: boolean; passwordHash?: string }) {
+    const payload: any = {
+      updatedAt: new Date().toISOString(),
+    };
+    if (data.name !== undefined) payload.name = data.name.trim();
+    if (data.active !== undefined) payload.active = data.active;
+    if (data.passwordHash !== undefined) payload.passwordHash = data.passwordHash;
+
+    if (isSupabaseConfigured) {
+      const { data: record, error } = await supabase
+        .from('admin_users')
+        .update(payload)
+        .eq('id', id)
+        .select('id, email, name, active, createdAt, updatedAt')
+        .single();
+
+      if (!error && record) return record;
+      if (error) {
+        console.error('Supabase updateAdmin error:', error);
+        throw new Error(error.message);
+      }
+    }
+
+    try {
+      return await db.adminUser.update({
+        where: { id },
+        data: payload,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          active: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (dbErr) {
+      console.error('Prisma updateAdmin fallback failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  async deleteAdmin(id: number) {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('admin_users')
+        .delete()
+        .eq('id', id);
+
+      if (!error) return true;
+      if (error) {
+        console.error('Supabase deleteAdmin error:', error);
+        throw new Error(error.message);
+      }
+    }
+
+    try {
+      await db.adminUser.delete({ where: { id } });
+      return true;
+    } catch (dbErr) {
+      console.error('Prisma deleteAdmin fallback failed:', dbErr);
+      return false;
+    }
   }
 };
+
 

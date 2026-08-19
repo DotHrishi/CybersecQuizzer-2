@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import {
   Lock, Plus, Edit2, Trash2, Download, Upload, AlertTriangle,
   X, Eye, EyeOff, RefreshCw, ShieldCheck, BarChart2,
@@ -11,7 +12,10 @@ import {
   Trophy, Clock, Target, TrendingUp, Hash, ChevronsUpDown, Award,
   ShieldAlert, Layers, CalendarDays, Flame,
   AlertOctagon, CheckCircle, XCircle, TrendingDown,
+  Mail, LogOut, Key, User,
 } from 'lucide-react';
+
+
 import toast from 'react-hot-toast';
 
 /* ─── Types ─────────────────────────────────────────────── */
@@ -96,8 +100,11 @@ function ExpandedRow({ q }: { q: Question }) {
   );
 }
 
-function LoginScreen({ onLogin, isLoading }: { onLogin: (pwd: string) => void; isLoading: boolean }) {
+function LoginScreen({ onLogin, isLoading }: { onLogin: (email: string, pwd: string) => void; isLoading: boolean }) {
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div className="max-w-md mx-auto my-16 card p-8 text-center space-y-6">
       <div className="w-12 h-12 mx-auto rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
@@ -105,20 +112,85 @@ function LoginScreen({ onLogin, isLoading }: { onLogin: (pwd: string) => void; i
       </div>
       <div>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Admin Authentication</h2>
-        <p className="text-xs text-slate-500 mt-1">Enter your admin password to manage the question bank</p>
+        <p className="text-xs text-slate-500 mt-1">Enter your admin credentials to access the question bank</p>
       </div>
-      <form onSubmit={e => { e.preventDefault(); if (password.trim()) onLogin(password); }} className="space-y-4">
-        <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter admin password..." autoFocus className="field-input pl-9" />
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          if (identifier.trim() && password.trim()) onLogin(identifier.trim(), password);
+        }}
+        className="space-y-4 text-left"
+      >
+        <div>
+          <label className="field-label">Admin Username / Email</label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={identifier}
+              onChange={e => setIdentifier(e.target.value)}
+              placeholder="e.g. admin or admin@school.edu"
+              autoFocus
+              className="field-input pl-9"
+              required
+            />
+          </div>
         </div>
-        <button type="submit" disabled={isLoading || !password.trim()} className="btn btn-primary btn-md w-full justify-center gap-2">
-          {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Authenticating...</> : <><ShieldCheck className="w-4 h-4" />Unlock Admin Panel</>}
+
+        <div>
+          <label className="field-label">Password</label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Enter your admin password..."
+              className="field-input pl-9 pr-10"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading || !identifier.trim() || !password.trim()}
+          className="btn btn-primary btn-md w-full justify-center gap-2 mt-2"
+        >
+          {isLoading ? (
+            <><Loader2 className="w-4 h-4 animate-spin" />Authenticating...</>
+          ) : (
+            <><ShieldCheck className="w-4 h-4" />Unlock Admin Panel</>
+          )}
         </button>
+
+        {/* Super Admin Login Button */}
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 text-center">
+          <Link
+            href="/superadmin"
+            className="btn btn-secondary btn-sm w-full justify-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+          >
+            <Key className="w-3.5 h-3.5 text-amber-500" />
+            <span>Login as Super Admin</span>
+          </Link>
+          <p className="text-[11px] text-slate-400 mt-1.5">
+            Super admin can create &amp; manage credentials for normal admins
+          </p>
+        </div>
       </form>
     </div>
   );
 }
+
+
 
 /* ─── Question modal ─────────────────────────────────────── */
 function QuestionModal({ editingId, formData, setFormData, onSave, onClose, saving }: {
@@ -1610,8 +1682,12 @@ function TrendReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; 
 /* ═══════════════════════════════════════════════════════════
    MAIN ADMIN DASHBOARD
 ═══════════════════════════════════════════════════════════ */
+const ADMIN_STORAGE_KEY = 'cybersec_admin_token';
+const ADMIN_USER_STORAGE_KEY = 'cybersec_admin_email';
+
 export default function AdminDashboard() {
-  const [password, setPassword]           = useState('');
+  const [adminToken, setAdminToken]       = useState<string | null>(null);
+  const [adminEmail, setAdminEmail]       = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [questions, setQuestions]         = useState<Question[]>([]);
   const [stats, setStats]                 = useState<Stats | null>(null);
@@ -1661,16 +1737,41 @@ export default function AdminDashboard() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  /* ── Check stored admin session on mount ── */
+  useEffect(() => {
+    const savedToken = sessionStorage.getItem(ADMIN_STORAGE_KEY);
+    const savedEmail = sessionStorage.getItem(ADMIN_USER_STORAGE_KEY);
+    if (savedToken) {
+      setAdminToken(savedToken);
+      if (savedEmail) setAdminEmail(savedEmail);
+      fetchAdminData(savedToken);
+    }
+  }, []);
+
   /* ── Fetch admin data ── */
-  const fetchAdminData = useCallback(async (pwd: string) => {
+  const fetchAdminData = useCallback(async (authToken: string) => {
     setIsLoading(true);
     try {
+      const authHeaders = {
+        'x-admin-token': authToken,
+        'x-admin-password': authToken,
+      };
+
       const [qRes, sRes, lRes] = await Promise.all([
-        fetch('/api/admin/questions', { headers: { 'x-admin-password': pwd } }),
-        fetch('/api/admin/stats',     { headers: { 'x-admin-password': pwd } }),
+        fetch('/api/admin/questions', { headers: authHeaders }),
+        fetch('/api/admin/stats',     { headers: authHeaders }),
         fetch('/api/leaderboard?period=all-time'),
       ]);
-      if (qRes.status === 401) { toast.error('Invalid admin password.'); setIsAuthenticated(false); return; }
+
+      if (qRes.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        sessionStorage.removeItem(ADMIN_STORAGE_KEY);
+        sessionStorage.removeItem(ADMIN_USER_STORAGE_KEY);
+        setAdminToken(null);
+        setIsAuthenticated(false);
+        return;
+      }
+
       const [qData, sData, lData] = await Promise.all([qRes.json(), sRes.json(), lRes.json()]);
       if (qData.success && sData.success) {
         setQuestions(qData.questions || []);
@@ -1680,11 +1781,52 @@ export default function AdminDashboard() {
       } else {
         toast.error(qData.message || 'Error loading admin data.');
       }
-    } catch { toast.error('Network error.'); }
-    finally { setIsLoading(false); }
+    } catch {
+      toast.error('Network error.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const handleLogin = (pwd: string) => { setPassword(pwd); fetchAdminData(pwd); };
+  const handleLogin = async (email: string, pwd: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password: pwd }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.token) {
+        toast.success(data.message || 'Authenticated as Admin!');
+        sessionStorage.setItem(ADMIN_STORAGE_KEY, data.token);
+        if (data.admin?.email) {
+          sessionStorage.setItem(ADMIN_USER_STORAGE_KEY, data.admin.email);
+          setAdminEmail(data.admin.email);
+        }
+        setAdminToken(data.token);
+        setIsAuthenticated(true);
+        fetchAdminData(data.token);
+      } else {
+        toast.error(data.message || 'Invalid email or password.');
+      }
+    } catch {
+      toast.error('Login request failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem(ADMIN_STORAGE_KEY);
+    sessionStorage.removeItem(ADMIN_USER_STORAGE_KEY);
+    setAdminToken(null);
+    setAdminEmail(null);
+    setIsAuthenticated(false);
+    toast.success('Admin logged out.');
+  };
+
   if (!isAuthenticated) return <LoginScreen onLogin={handleLogin} isLoading={isLoading} />;
 
   /* ── Derived question filter ── */
@@ -1702,6 +1844,12 @@ export default function AdminDashboard() {
   const allFilteredSelected = filtered.length > 0 && filtered.every(q => selectedIds.has(q.id));
   const someSelected = selectedIds.size > 0;
 
+  /* ── Auth headers helper ── */
+  const getAuthHeaders = () => ({
+    'x-admin-token': adminToken || '',
+    'x-admin-password': adminToken || '',
+  });
+
   /* ── Handlers ── */
   const openAddModal  = () => { setEditingId(null); setFormData({ ...defaultForm }); setModalOpen(true); };
   const openEditModal = (q: Question) => {
@@ -1718,32 +1866,64 @@ export default function AdminDashboard() {
     try {
       const method = editingId ? 'PUT' : 'POST';
       const body   = editingId ? { id: editingId, ...formData } : formData;
-      const res    = await fetch('/api/admin/questions', { method, headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify(body) });
+      const res    = await fetch('/api/admin/questions', {
+        method,
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify(body),
+      });
       const data   = await res.json();
-      if (data.success) { toast.success(editingId ? 'Question updated!' : 'Question added!'); setModalOpen(false); fetchAdminData(password); }
-      else toast.error(data.message || 'Save failed.');
-    } catch { toast.error('Failed to save.'); }
-    finally { setFormSaving(false); }
+      if (data.success) {
+        toast.success(editingId ? 'Question updated!' : 'Question added!');
+        setModalOpen(false);
+        if (adminToken) fetchAdminData(adminToken);
+      } else {
+        toast.error(data.message || 'Save failed.');
+      }
+    } catch {
+      toast.error('Failed to save.');
+    } finally {
+      setFormSaving(false);
+    }
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     const { id } = deleteTarget; setDeleteTarget(null);
     try {
-      const res  = await fetch(`/api/admin/questions?id=${id}`, { method: 'DELETE', headers: { 'x-admin-password': password } });
+      const res  = await fetch(`/api/admin/questions?id=${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
-      if (data.success) { toast.success(`Question #${id} deleted.`); fetchAdminData(password); setSelectedIds(p => { const n = new Set(p); n.delete(id); return n; }); }
-      else toast.error(data.message);
-    } catch { toast.error('Delete failed.'); }
+      if (data.success) {
+        toast.success(`Question #${id} deleted.`);
+        if (adminToken) fetchAdminData(adminToken);
+        setSelectedIds(p => { const n = new Set(p); n.delete(id); return n; });
+      } else {
+        toast.error(data.message);
+      }
+    } catch {
+      toast.error('Delete failed.');
+    }
   };
 
   const handleToggleActive = async (q: Question) => {
     try {
-      const res  = await fetch('/api/admin/questions', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify({ id: q.id, active: !q.active }) });
+      const res  = await fetch('/api/admin/questions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ id: q.id, active: !q.active }),
+      });
       const data = await res.json();
-      if (data.success) { toast.success(`Question ${!q.active ? 'enabled' : 'disabled'}.`); setQuestions(p => p.map(i => i.id === q.id ? { ...i, active: !q.active } : i)); }
-      else toast.error(data.message);
-    } catch { toast.error('Toggle failed.'); }
+      if (data.success) {
+        toast.success(`Question ${!q.active ? 'enabled' : 'disabled'}.`);
+        setQuestions(p => p.map(i => i.id === q.id ? { ...i, active: !q.active } : i));
+      } else {
+        toast.error(data.message);
+      }
+    } catch {
+      toast.error('Toggle failed.');
+    }
     setMenuOpenId(null);
   };
 
@@ -1769,10 +1949,21 @@ export default function AdminDashboard() {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
         if (!Array.isArray(parsed)) { toast.error('JSON must be an array.'); return; }
-        const res  = await fetch('/api/admin/questions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify(parsed) });
+        const res  = await fetch('/api/admin/questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify(parsed),
+        });
         const data = await res.json();
-        if (data.success) { toast.success(data.message); fetchAdminData(password); } else toast.error(data.message);
-      } catch { toast.error('Invalid JSON file.'); }
+        if (data.success) {
+          toast.success(data.message);
+          if (adminToken) fetchAdminData(adminToken);
+        } else {
+          toast.error(data.message);
+        }
+      } catch {
+        toast.error('Invalid JSON file.');
+      }
     };
     reader.readAsText(e.target.files[0], 'UTF-8');
     e.target.value = '';
@@ -1781,10 +1972,21 @@ export default function AdminDashboard() {
   const handleResetLeaderboard = async () => {
     if (!window.confirm('CAUTION: This will delete ALL user attempt history. Cannot be undone.')) return;
     try {
-      const res  = await fetch('/api/admin/reset', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify({ target: 'leaderboard' }) });
+      const res  = await fetch('/api/admin/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ target: 'leaderboard' }),
+      });
       const data = await res.json();
-      if (data.success) { toast.success(data.message); fetchAdminData(password); } else toast.error(data.message);
-    } catch { toast.error('Reset failed.'); }
+      if (data.success) {
+        toast.success(data.message);
+        if (adminToken) fetchAdminData(adminToken);
+      } else {
+        toast.error(data.message);
+      }
+    } catch {
+      toast.error('Reset failed.');
+    }
   };
 
   const executeBulk = async () => {
@@ -1801,16 +2003,23 @@ export default function AdminDashboard() {
       for (const id of ids) {
         try {
           if (bulkAction === 'delete') {
-            const r = await fetch(`/api/admin/questions?id=${id}`, { method: 'DELETE', headers: { 'x-admin-password': password } });
+            const r = await fetch(`/api/admin/questions?id=${id}`, {
+              method: 'DELETE',
+              headers: getAuthHeaders(),
+            });
             (await r.json()).success ? success++ : failed++;
           } else {
             const active = bulkAction === 'enable';
-            const r = await fetch('/api/admin/questions', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify({ id, active }) });
+            const r = await fetch('/api/admin/questions', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+              body: JSON.stringify({ id, active }),
+            });
             (await r.json()).success ? success++ : failed++;
           }
         } catch { failed++; }
       }
-      fetchAdminData(password);
+      if (adminToken) fetchAdminData(adminToken);
     }
     setSelectedIds(new Set());
     setBulkResults({ success, failed });
@@ -1827,25 +2036,48 @@ export default function AdminDashboard() {
 
       {/* Page header */}
       <div className="page-header mb-0">
-        <div className="breadcrumb"><span>Admin</span><span className="breadcrumb-sep">/</span><span className="breadcrumb-current">{adminTab === 'questions' ? 'Question Bank' : 'Reports'}</span></div>
+        <div className="breadcrumb">
+          <span>Admin</span>
+          <span className="breadcrumb-sep">/</span>
+          <span className="breadcrumb-current">{adminTab === 'questions' ? 'Question Bank' : 'Reports'}</span>
+        </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="page-title">Admin Panel</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="page-title">Admin Panel</h1>
+              {adminEmail && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  <Mail className="w-3 h-3 text-slate-400" />
+                  {adminEmail}
+                </span>
+              )}
+            </div>
             <p className="page-subtitle">Manage questions, monitor activity, and view programme reports.</p>
           </div>
-          {adminTab === 'questions' && (
-            <div className="flex flex-wrap gap-2">
-              <button onClick={openAddModal} className="btn btn-primary btn-sm gap-1.5"><Plus className="w-3.5 h-3.5" />Add Question</button>
-              <button onClick={handleExportJSON} className="btn btn-secondary btn-sm gap-1.5"><Download className="w-3.5 h-3.5" />Export</button>
-              <label className="btn btn-secondary btn-sm gap-1.5 cursor-pointer"><Upload className="w-3.5 h-3.5" />Import<input type="file" accept=".json" onChange={handleImportJSON} className="hidden" /></label>
-              <button onClick={handleResetLeaderboard} className="btn btn-sm gap-1.5 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-950/50"><AlertTriangle className="w-3.5 h-3.5" />Reset LB</button>
-            </div>
-          )}
-          {adminTab === 'reports' && (
-            <button onClick={() => fetchAdminData(password)} className="btn btn-secondary btn-sm gap-1.5"><RefreshCw className="w-3.5 h-3.5" />Refresh</button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {adminTab === 'questions' && (
+              <>
+                <button onClick={openAddModal} className="btn btn-primary btn-sm gap-1.5"><Plus className="w-3.5 h-3.5" />Add Question</button>
+                <button onClick={handleExportJSON} className="btn btn-secondary btn-sm gap-1.5"><Download className="w-3.5 h-3.5" />Export</button>
+                <label className="btn btn-secondary btn-sm gap-1.5 cursor-pointer"><Upload className="w-3.5 h-3.5" />Import<input type="file" accept=".json" onChange={handleImportJSON} className="hidden" /></label>
+                <button onClick={handleResetLeaderboard} className="btn btn-sm gap-1.5 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-950/50"><AlertTriangle className="w-3.5 h-3.5" />Reset LB</button>
+              </>
+            )}
+            {adminTab === 'reports' && (
+              <button onClick={() => adminToken && fetchAdminData(adminToken)} className="btn btn-secondary btn-sm gap-1.5"><RefreshCw className="w-3.5 h-3.5" />Refresh</button>
+            )}
+            <button
+              onClick={handleLogout}
+              title="Log out of Admin Panel"
+              className="btn btn-secondary btn-sm gap-1.5 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
         </div>
       </div>
+
 
       {/* KPI strip — always visible */}
       {stats && (

@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dataService } from '@/lib/dataService';
-
-function verifyAdminAuth(req: NextRequest): boolean {
-  const adminHeader = req.headers.get('x-admin-password')?.trim();
-  const expectedPassword = (process.env.ADMIN_PASSWORD || 'cyberadmin123').trim();
-  return Boolean(adminHeader && adminHeader === expectedPassword);
-}
+import { verifyAdminRequest } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
-  if (!verifyAdminAuth(req)) {
+  const { isAuth } = await verifyAdminRequest(req);
+  if (!isAuth) {
     return NextResponse.json({ success: false, message: 'Unauthorized admin request.' }, { status: 401 });
   }
 
