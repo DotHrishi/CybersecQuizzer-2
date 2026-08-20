@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Clock, CheckCircle2, ArrowRight, Loader2,
-  ShieldCheck, Keyboard, AlertCircle
+  ShieldCheck, Keyboard, AlertCircle, BookOpen
 } from 'lucide-react';
 import { QuestionClientDTO, OptionKey } from '@/types/quiz';
 import { QuizSubmissionSchema } from '@/lib/validation';
@@ -190,6 +190,19 @@ export default function QuizCard({ questionData, userName, onSubmitted }: QuizCa
           <span>{seconds}s</span>
         </div>
       </div>
+
+      {/* ── Scenario Box (if present) ── */}
+      {questionData.scenario && questionData.scenario.trim().length > 0 && (
+        <div className="rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-indigo-50/30 to-blue-50/40 dark:from-indigo-950/40 dark:via-slate-900/80 dark:to-blue-950/30 p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 mb-2">
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Case Scenario / Context</span>
+          </div>
+          <p className="text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-relaxed font-normal">
+            {questionData.scenario}
+          </p>
+        </div>
+      )}
 
       {/* ── Question text ── */}
       <div>

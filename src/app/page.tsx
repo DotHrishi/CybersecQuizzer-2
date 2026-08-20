@@ -85,6 +85,7 @@ export default function HomePage() {
         setQuestionData({
           sessionId: data.sessionId,
           sessionToken: data.sessionToken,
+          scenario: data.question.scenario || null,
           questionText: data.question.questionText,
           options: data.question.options,
           category: data.question.category,

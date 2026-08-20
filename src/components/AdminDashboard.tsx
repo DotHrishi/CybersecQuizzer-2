@@ -20,7 +20,9 @@ import toast from 'react-hot-toast';
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface Question {
-  id: number; questionText: string;
+  id: number;
+  scenario?: string | null;
+  questionText: string;
   optionA: string; optionB: string; optionC: string; optionD: string;
   correctOption: string; category: string; difficulty: string;
   active: boolean; createdAt: string; updatedAt?: string;
@@ -43,6 +45,7 @@ type FilterDifficulty = 'All' | 'Easy' | 'Medium' | 'Hard';
 type FilterStatus = 'All' | 'Active' | 'Disabled';
 
 const defaultForm = {
+  scenario: '',
   questionText: '',
   optionA: '', optionB: '', optionC: '', optionD: '',
   correctOption: 'A' as 'A'|'B'|'C'|'D',
@@ -79,7 +82,15 @@ function DiffBadge({ d }: { d: string }) {
 function ExpandedRow({ q }: { q: Question }) {
   return (
     <tr className="bg-slate-50/80 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-700">
-      <td colSpan={8} className="px-4 py-4">
+      <td colSpan={8} className="px-4 py-4 space-y-3">
+        {q.scenario && (
+          <div className="p-3 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs">
+            <span className="font-extrabold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider text-[10px] block mb-1">
+              Case Scenario:
+            </span>
+            <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{q.scenario}</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           {(['A','B','C','D'] as const).map(opt => (
             <div key={opt} className={`p-3 rounded-lg border ${q.correctOption === opt ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' : 'card-sunken'}`}>
@@ -91,7 +102,7 @@ function ExpandedRow({ q }: { q: Question }) {
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-slate-400 mt-3">
+        <p className="text-[11px] text-slate-400 mt-1">
           Created: {new Date(q.createdAt).toLocaleString()}
           {q.updatedAt && ` · Updated: ${new Date(q.updatedAt).toLocaleString()}`}
         </p>
@@ -206,8 +217,21 @@ function QuestionModal({ editingId, formData, setFormData, onSave, onClose, savi
         </div>
         <form onSubmit={onSave} className="p-6 space-y-4">
           <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="field-label mb-0">Case Scenario / Context <span className="text-slate-400 font-normal">(Optional)</span></label>
+              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">Boxed separately above question</span>
+            </div>
+            <textarea
+              rows={3}
+              value={formData.scenario || ''}
+              onChange={e => setFormData(f => ({ ...f, scenario: e.target.value }))}
+              placeholder="e.g. Rahul works as a system administrator and needs to set a master password for a secure server..."
+              className="field-input resize-none text-xs"
+            />
+          </div>
+          <div>
             <label className="field-label">Question Text <span className="text-rose-500">*</span></label>
-            <textarea rows={3} value={formData.questionText} onChange={e => setFormData(f => ({ ...f, questionText: e.target.value }))} placeholder="Enter the full question text..." className="field-input resize-none" required />
+            <textarea rows={2} value={formData.questionText} onChange={e => setFormData(f => ({ ...f, questionText: e.target.value }))} placeholder="e.g. Which of the following employee passwords meets this requirement?" className="field-input resize-none" required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             {(['A','B','C','D'] as const).map(opt => (
@@ -1135,7 +1159,16 @@ function QuestionBankReport({ questions }: { questions: Question[] }) {
                 : filtered.map(q => (
                   <tr key={q.id} className={`table-row ${!q.active ? 'opacity-50' : ''}`}>
                     <td className="table-td font-mono text-slate-400 text-[11px]">#{q.id}</td>
-                    <td className="table-td max-w-xs"><span className="line-clamp-2 text-xs text-slate-800 dark:text-slate-200">{q.questionText}</span></td>
+                    <td className="table-td max-w-xs">
+                      <div className="space-y-1">
+                        {q.scenario && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                            Scenario
+                          </span>
+                        )}
+                        <span className="line-clamp-2 text-xs text-slate-800 dark:text-slate-200 block">{q.questionText}</span>
+                      </div>
+                    </td>
                     <td className="table-td"><span className="badge badge-slate">{q.category}</span></td>
                     <td className="table-td"><DiffBadge d={q.difficulty} /></td>
                     <td className="table-td text-center font-bold text-slate-900 dark:text-white">{q.correctOption}</td>
@@ -2003,7 +2036,18 @@ export default function AdminDashboard() {
   const openAddModal  = () => { setEditingId(null); setFormData({ ...defaultForm }); setModalOpen(true); };
   const openEditModal = (q: Question) => {
     setEditingId(q.id);
-    setFormData({ questionText: q.questionText, optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD, correctOption: q.correctOption as any, category: q.category, difficulty: q.difficulty as any, active: q.active });
+    setFormData({
+      scenario: q.scenario || '',
+      questionText: q.questionText,
+      optionA: q.optionA,
+      optionB: q.optionB,
+      optionC: q.optionC,
+      optionD: q.optionD,
+      correctOption: q.correctOption as any,
+      category: q.category,
+      difficulty: q.difficulty as any,
+      active: q.active,
+    });
     setModalOpen(true); setMenuOpenId(null);
   };
 
@@ -2408,7 +2452,14 @@ export default function AdminDashboard() {
                               <button onClick={() => setExpandedId(expandedId === q.id ? null : q.id)} className="mt-0.5 btn-icon w-4 h-4 shrink-0 text-slate-300 hover:text-slate-600 dark:hover:text-slate-200">
                                 {expandedId === q.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                               </button>
-                              <span className="font-medium text-slate-900 dark:text-white line-clamp-2 text-xs leading-snug">{q.questionText}</span>
+                              <div className="space-y-1">
+                                {q.scenario && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                                    Scenario
+                                  </span>
+                                )}
+                                <span className="font-medium text-slate-900 dark:text-white line-clamp-2 text-xs leading-snug block">{q.questionText}</span>
+                              </div>
                             </div>
                           </td>
                           <td className="table-td"><span className="badge badge-slate">{q.category}</span></td>

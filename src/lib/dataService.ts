@@ -52,7 +52,7 @@ export const dataService = {
       try {
         const { data, error } = await supabase
           .from('questions')
-          .select('id, questionText, optionA, optionB, optionC, optionD, category, difficulty')
+          .select('id, scenario, questionText, optionA, optionB, optionC, optionD, category, difficulty')
           .eq('active', true);
 
         if (!error && data) {
@@ -68,7 +68,7 @@ export const dataService = {
 
     try {
       const questions: any[] = await db.$queryRaw`
-        SELECT id, questionText, optionA, optionB, optionC, optionD, category, difficulty
+        SELECT id, scenario, questionText, optionA, optionB, optionC, optionD, category, difficulty
         FROM questions
         WHERE active = 1
         ORDER BY RANDOM()
@@ -86,7 +86,7 @@ export const dataService = {
       try {
         const { data, error } = await supabase
           .from('questions')
-          .select('id, correctOption, optionA, optionB, optionC, optionD, category')
+          .select('id, scenario, correctOption, optionA, optionB, optionC, optionD, category')
           .eq('id', id)
           .maybeSingle();
 
@@ -100,7 +100,7 @@ export const dataService = {
     try {
       return await db.question.findUnique({
         where: { id },
-        select: { id: true, correctOption: true, optionA: true, optionB: true, optionC: true, optionD: true, category: true },
+        select: { id: true, scenario: true, correctOption: true, optionA: true, optionB: true, optionC: true, optionD: true, category: true },
       });
     } catch (dbErr) {
       console.error('Prisma getQuestionById fallback failed:', dbErr);

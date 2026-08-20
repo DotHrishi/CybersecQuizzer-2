@@ -131,6 +131,7 @@ export async function GET(req: NextRequest) {
       sessionId,
       sessionToken,
       question: {
+        scenario: targetQuestion.scenario || null,
         questionText: targetQuestion.questionText,
         options: shuffledOptions,
         category: targetQuestion.category,

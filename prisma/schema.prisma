@@ -9,6 +9,7 @@ generator client {
 
 model Question {
   id            Int      @id @default(autoincrement())
+  scenario      String?  // Optional situational / context background text
   questionText  String
   optionA       String
   optionB       String
