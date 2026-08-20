@@ -47,18 +47,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Backend enforcement: Check 5-day grace period for valid college & password
+    // Backend enforcement: Check 5-day grace period for valid registration key & password
     const profile = await dataService.getUserProfile(userName);
     if (profile) {
-      const graceStatus = getStudentGracePeriodStatus(profile.createdAt);
+      const graceStatus = getStudentGracePeriodStatus(profile);
       if (graceStatus.isBeyondGracePeriod) {
-        if (isDummyCollege(profile.college?.name)) {
+        if (!profile.collegeDepartmentId) {
           return NextResponse.json({
             success: true,
             userName,
-            guardState: 'COLLEGE_REQUIRED',
+            guardState: 'REGISTRATION_KEY_REQUIRED',
             isOpen: false,
-            message: 'Your college/school information is required to continue. Please update your profile with the exact name provided by your college administrator.',
+            message: 'A valid registration key is required to continue. Please update your profile with the key provided by your college/department administrator.',
           });
         }
         if (!profile.passwordHash) {

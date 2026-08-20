@@ -4,7 +4,7 @@ import { verifyAdminRequest, hashPassword } from '@/lib/auth';
 import { validateStudentPassword } from '@/lib/collegeNormalization';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
-// GET: List students belonging to the authenticated admin's college
+// GET: List students belonging to the authenticated admin's scope (department or college)
 export async function GET(req: NextRequest) {
   const { isAuth, admin } = await verifyAdminRequest(req);
   if (!isAuth || !admin) {
@@ -12,11 +12,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const collegeId = admin.isSuperAdmin ? null : admin.collegeId;
-    const students = await dataService.getStudentsByCollege(collegeId);
+    const scope = admin.isSuperAdmin
+      ? {}
+      : {
+          collegeDepartmentId: admin.collegeDepartmentId || null,
+          collegeId: admin.collegeId || null,
+        };
 
-    // Fetch attempts to attach stats to each student
-    const attempts = await dataService.getAttemptsByCollege(collegeId);
+    const students = await dataService.getStudentsByScope(scope);
+    const attempts = await dataService.getAttemptsByScope(scope);
     const attemptsByStudent = new Map<string, any[]>();
 
     for (const a of attempts) {
@@ -33,6 +37,9 @@ export async function GET(req: NextRequest) {
       const totalTime = sAttempts.reduce((sum: number, a: any) => sum + Number(a.responseTimeMs || 0), 0);
       const avgResponseTimeMs = totalAttempts > 0 ? Math.round(totalTime / totalAttempts) : 0;
 
+      const collegeName = s.collegeDepartment?.college?.name || s.college?.name || null;
+      const departmentName = s.collegeDepartment?.departmentName || null;
+
       return {
         id: s.id,
         fullName: s.fullName,
@@ -40,10 +47,18 @@ export async function GET(req: NextRequest) {
         email: s.email,
         emailType: s.emailType,
         collegeId: s.collegeId,
-        college: s.college ? {
-          id: s.college.id,
-          name: s.college.name,
-          identifier: s.college.identifier,
+        collegeDepartmentId: s.collegeDepartmentId,
+        collegeName,
+        departmentName,
+        college: s.college || s.collegeDepartment?.college ? {
+          id: s.collegeDepartment?.college?.id || s.college?.id,
+          name: collegeName,
+          identifier: s.collegeDepartment?.college?.identifier || s.college?.identifier,
+        } : null,
+        collegeDepartment: s.collegeDepartment ? {
+          id: s.collegeDepartment.id,
+          departmentName: s.collegeDepartment.departmentName,
+          registrationKey: s.collegeDepartment.registrationKey,
         } : null,
         hasPassword: Boolean(s.passwordHash),
         createdAt: s.createdAt,
@@ -57,7 +72,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       collegeId: admin.collegeId,
-      college: admin.college,
+      collegeDepartmentId: admin.collegeDepartmentId,
+      college: admin.college || admin.collegeDepartment?.college || null,
+      collegeDepartment: admin.collegeDepartment || null,
       students: studentsWithStats,
     });
   } catch (error: any) {
@@ -91,12 +108,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: `Student "${cleanNick}" not found.` }, { status: 404 });
     }
 
-    // Security Check: Verify admin has authorization for this student's college
-    if (!admin.isSuperAdmin && admin.collegeId && student.collegeId !== admin.collegeId) {
-      return NextResponse.json({
-        success: false,
-        message: 'Forbidden: You do not have permission to manage students outside your college.',
-      }, { status: 403 });
+    // Security Check: Verify admin has authorization for this student's department/college
+    if (!admin.isSuperAdmin) {
+      if (admin.collegeDepartmentId && student.collegeDepartmentId !== admin.collegeDepartmentId) {
+        return NextResponse.json({
+          success: false,
+          message: 'Forbidden: You do not have permission to manage students outside your assigned department.',
+        }, { status: 403 });
+      }
+      if (admin.collegeId && student.collegeId !== admin.collegeId && student.collegeDepartment?.collegeId !== admin.collegeId) {
+        return NextResponse.json({
+          success: false,
+          message: 'Forbidden: You do not have permission to manage students outside your college.',
+        }, { status: 403 });
+      }
     }
 
     let passwordToSet = newPassword;

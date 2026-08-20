@@ -43,51 +43,72 @@ model UserAttempt {
 }
 
 model College {
-  id         Int           @id @default(autoincrement())
-  name       String        @unique
-  identifier String        @unique
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  admins     AdminUser[]
-  students   UserProfile[]
+  id          Int                 @id @default(autoincrement())
+  name        String              @unique
+  identifier  String              @unique
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  departments CollegeDepartment[]
+  admins      AdminUser[]
+  students    UserProfile[]
 
   @@map("colleges")
 }
 
+model CollegeDepartment {
+  id              Int           @id @default(autoincrement())
+  collegeId       Int
+  college         College       @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  departmentName  String
+  registrationKey String        @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  students        UserProfile[]
+  admins          AdminUser[]
+
+  @@unique([collegeId, departmentName])
+  @@index([collegeId])
+  @@index([registrationKey])
+  @@map("college_departments")
+}
+
 model UserProfile {
-  id             Int      @id @default(autoincrement())
-  fullName       String
-  nickname       String   @unique
-  isNicknameSame Boolean  @default(false)
-  email          String
-  emailType      String   @default("college") // "college" or "personal"
-  collegeId      Int
-  college        College  @relation(fields: [collegeId], references: [id])
-  passwordHash   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                  Int                @id @default(autoincrement())
+  fullName            String
+  nickname            String             @unique
+  isNicknameSame      Boolean            @default(false)
+  email               String
+  emailType           String             @default("college") // "college" or "personal"
+  collegeId           Int?
+  college             College?           @relation(fields: [collegeId], references: [id])
+  collegeDepartmentId Int?
+  collegeDepartment   CollegeDepartment? @relation(fields: [collegeDepartmentId], references: [id])
+  passwordHash        String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@index([nickname])
   @@index([email])
   @@index([collegeId])
+  @@index([collegeDepartmentId])
   @@map("user_profiles")
 }
 
 model AdminUser {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  active       Boolean  @default(true)
-  collegeId    Int?
-  college      College? @relation(fields: [collegeId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                  Int                @id @default(autoincrement())
+  email               String             @unique
+  passwordHash        String
+  name                String?
+  active              Boolean            @default(true)
+  collegeId           Int?
+  college             College?           @relation(fields: [collegeId], references: [id])
+  collegeDepartmentId Int?
+  collegeDepartment   CollegeDepartment? @relation(fields: [collegeDepartmentId], references: [id])
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@index([email])
   @@index([collegeId])
+  @@index([collegeDepartmentId])
   @@map("admin_users")
 }
-
-
-

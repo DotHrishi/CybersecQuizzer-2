@@ -38,6 +38,8 @@ export interface AdminTokenPayload {
   name?: string | null;
   collegeId: number | null;
   collegeName?: string | null;
+  collegeDepartmentId?: number | null;
+  departmentName?: string | null;
   role: 'admin';
   exp: number; // Unix ms
 }
@@ -53,6 +55,8 @@ export function signAdminToken(admin: {
   name?: string | null;
   collegeId?: number | null;
   collegeName?: string | null;
+  collegeDepartmentId?: number | null;
+  departmentName?: string | null;
 }): string {
   const payload: AdminTokenPayload = {
     id: admin.id,
@@ -60,6 +64,8 @@ export function signAdminToken(admin: {
     name: admin.name || null,
     collegeId: admin.collegeId ?? null,
     collegeName: admin.collegeName || null,
+    collegeDepartmentId: admin.collegeDepartmentId ?? null,
+    departmentName: admin.departmentName || null,
     role: 'admin',
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
   };
@@ -153,6 +159,7 @@ export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: bo
         name: 'Super Admin',
         isSuperAdmin: true,
         collegeId: null,
+        collegeDepartmentId: null,
       },
     };
   }
@@ -162,7 +169,6 @@ export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: bo
   if (token) {
     const payload = verifyAdminToken(token);
     if (payload) {
-      // Check if admin is active in database and fetch fresh college association
       const admin = await dataService.getAdminById(payload.id);
       if (admin && admin.active) {
         return {
@@ -173,11 +179,12 @@ export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: bo
             name: admin.name,
             collegeId: admin.collegeId,
             college: admin.college,
+            collegeDepartmentId: admin.collegeDepartmentId,
+            collegeDepartment: admin.collegeDepartment,
             isSuperAdmin: false,
           },
         };
       } else if (!admin) {
-        // Fallback to token payload if DB lookup returns null
         return {
           isAuth: true,
           admin: {
@@ -185,6 +192,7 @@ export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: bo
             email: payload.email,
             name: payload.name,
             collegeId: payload.collegeId,
+            collegeDepartmentId: payload.collegeDepartmentId,
             isSuperAdmin: false,
           },
         };
@@ -202,6 +210,7 @@ export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: bo
         email: 'admin@legacy',
         name: 'Legacy Admin',
         collegeId: null,
+        collegeDepartmentId: null,
         isSuperAdmin: false,
       },
     };
@@ -209,4 +218,3 @@ export async function verifyAdminRequest(req: NextRequest): Promise<{ isAuth: bo
 
   return { isAuth: false };
 }
-

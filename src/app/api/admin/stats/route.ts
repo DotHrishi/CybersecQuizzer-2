@@ -9,18 +9,24 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Strictly derive collegeId from authenticated admin record
-    const collegeId = admin.isSuperAdmin ? null : admin.collegeId;
-    const stats = await dataService.getStatsByCollege(collegeId);
+    const scope = admin.isSuperAdmin
+      ? {}
+      : {
+          collegeDepartmentId: admin.collegeDepartmentId || null,
+          collegeId: admin.collegeId || null,
+        };
+
+    const stats = await dataService.getStatsByScope(scope);
 
     return NextResponse.json({
       success: true,
       collegeId: admin.collegeId,
-      college: admin.college,
+      collegeDepartmentId: admin.collegeDepartmentId,
+      college: admin.college || admin.collegeDepartment?.college || null,
+      collegeDepartment: admin.collegeDepartment || null,
       stats,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
-

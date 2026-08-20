@@ -4,6 +4,21 @@ export interface CollegeDTO {
   identifier: string;
   createdAt?: string;
   updatedAt?: string;
+  departmentCount?: number;
+  studentCount?: number;
+  adminCount?: number;
+}
+
+export interface DepartmentDTO {
+  id: number;
+  collegeId: number;
+  departmentName: string;
+  registrationKey: string;
+  college?: CollegeDTO;
+  createdAt?: string;
+  updatedAt?: string;
+  studentCount?: number;
+  adminCount?: number;
 }
 
 export interface UserProfileDTO {
@@ -13,12 +28,18 @@ export interface UserProfileDTO {
   isNicknameSame: boolean;
   email: string;
   emailType: 'college' | 'personal';
-  collegeId: number;
-  college?: CollegeDTO;
+  collegeId?: number | null;
+  college?: CollegeDTO | null;
+  collegeDepartmentId?: number | null;
+  collegeDepartment?: DepartmentDTO | null;
+  collegeName?: string | null;
+  departmentName?: string | null;
+  registrationKey?: string | null;
   hasPassword?: boolean;
   isBeyondGracePeriod?: boolean;
   daysRemaining?: number;
   hoursRemaining?: number;
+  requiresRegistrationKey?: boolean;
   requiresCollegeUpdate?: boolean;
   requiresPassword?: boolean;
   createdAt?: string;
@@ -31,7 +52,8 @@ export interface UserProfileFormValues {
   isNicknameSame: boolean;
   email: string;
   emailType: 'college' | 'personal';
-  collegeName: string;
+  registrationKey?: string;
+  collegeName?: string;
   password?: string;
 }
 
@@ -47,5 +69,3 @@ export interface UserBadgeInfo {
   category?: string;
   badgeType?: 'milestone' | 'topic';
 }
-
-

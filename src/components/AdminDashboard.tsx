@@ -12,7 +12,7 @@ import {
   Trophy, Clock, Target, TrendingUp, Hash, ChevronsUpDown, Award,
   ShieldAlert, Layers, CalendarDays, Flame,
   AlertOctagon, CheckCircle, XCircle, TrendingDown,
-  Mail, LogOut, Key, User, Building2, Check, Copy,
+  Mail, LogOut, Key, User, Building2, Check, Copy, KeyRound, Edit3,
 } from 'lucide-react';
 
 
@@ -1750,50 +1750,57 @@ function TrendReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; 
 const ADMIN_STORAGE_KEY = 'cybersec_admin_token';
 const ADMIN_USER_STORAGE_KEY = 'cybersec_admin_email';
 const ADMIN_COLLEGE_STORAGE_KEY = 'cybersec_admin_college';
+const ADMIN_DEPT_STORAGE_KEY = 'cybersec_admin_dept';
 
 export default function AdminDashboard() {
-  const [adminToken, setAdminToken]       = useState<string | null>(null);
-  const [adminEmail, setAdminEmail]       = useState<string | null>(null);
-  const [adminCollege, setAdminCollege]   = useState<{ id: number; name: string; identifier: string } | null>(null);
+  const [adminToken, setAdminToken]           = useState<string | null>(null);
+  const [adminEmail, setAdminEmail]           = useState<string | null>(null);
+  const [adminCollege, setAdminCollege]       = useState<{ id: number; name: string; identifier: string } | null>(null);
+  const [adminDepartment, setAdminDepartment] = useState<{ id: number; departmentName: string; registrationKey: string; collegeId?: number } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [questions, setQuestions]         = useState<Question[]>([]);
-  const [stats, setStats]                 = useState<Stats | null>(null);
-  const [leaderboard, setLeaderboard]     = useState<LeaderboardEntry[]>([]);
-  const [isLoading, setIsLoading]         = useState(false);
+  const [questions, setQuestions]             = useState<Question[]>([]);
+  const [stats, setStats]                     = useState<Stats | null>(null);
+  const [leaderboard, setLeaderboard]         = useState<LeaderboardEntry[]>([]);
+  const [isLoading, setIsLoading]             = useState(false);
+
+  /* Registration Key management modal state */
+  const [keyModalOpen, setKeyModalOpen]       = useState(false);
+  const [newKeyInput, setNewKeyInput]         = useState('');
+  const [keyUpdating, setKeyUpdating]         = useState(false);
 
   /* Tab state */
-  const [adminTab, setAdminTab]           = useState<AdminTab>('questions');
-  const [reportTab, setReportTab]         = useState<ReportTab>('overview');
+  const [adminTab, setAdminTab]               = useState<AdminTab>('questions');
+  const [reportTab, setReportTab]             = useState<ReportTab>('overview');
 
   /* Question Bank filter state */
-  const [searchTerm, setSearchTerm]       = useState('');
-  const [filterCategory, setFilterCategory] = useState('All');
+  const [searchTerm, setSearchTerm]           = useState('');
+  const [filterCategory, setFilterCategory]   = useState('All');
   const [filterDifficulty, setFilterDifficulty] = useState<FilterDifficulty>('All');
-  const [filterStatus, setFilterStatus]   = useState<FilterStatus>('All');
-  const [activeView, setActiveView]       = useState('all');
+  const [filterStatus, setFilterStatus]       = useState<FilterStatus>('All');
+  const [activeView, setActiveView]           = useState('all');
 
   /* Selection */
-  const [selectedIds, setSelectedIds]     = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds]         = useState<Set<number>>(new Set());
 
   /* Row expansion */
-  const [expandedId, setExpandedId]       = useState<number | null>(null);
+  const [expandedId, setExpandedId]           = useState<number | null>(null);
 
   /* Context menu */
-  const [menuOpenId, setMenuOpenId]       = useState<number | null>(null);
+  const [menuOpenId, setMenuOpenId]           = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   /* Modals */
-  const [modalOpen, setModalOpen]         = useState(false);
-  const [editingId, setEditingId]         = useState<number | null>(null);
-  const [formData, setFormData]           = useState({ ...defaultForm });
-  const [formSaving, setFormSaving]       = useState(false);
-  const [deleteTarget, setDeleteTarget]   = useState<{ id: number; questionText: string } | null>(null);
+  const [modalOpen, setModalOpen]             = useState(false);
+  const [editingId, setEditingId]             = useState<number | null>(null);
+  const [formData, setFormData]               = useState({ ...defaultForm });
+  const [formSaving, setFormSaving]           = useState(false);
+  const [deleteTarget, setDeleteTarget]       = useState<{ id: number; questionText: string } | null>(null);
 
   /* Bulk */
-  const [bulkOpen, setBulkOpen]           = useState(false);
-  const [bulkAction, setBulkAction]       = useState<BulkAction>('enable');
-  const [bulkStep, setBulkStep]           = useState<BulkStep>('select');
-  const [bulkResults, setBulkResults]     = useState<{ success: number; failed: number } | undefined>();
+  const [bulkOpen, setBulkOpen]               = useState(false);
+  const [bulkAction, setBulkAction]           = useState<BulkAction>('enable');
+  const [bulkStep, setBulkStep]               = useState<BulkStep>('select');
+  const [bulkResults, setBulkResults]         = useState<{ success: number; failed: number } | undefined>();
 
   /* Close context menu on outside click */
   useEffect(() => {
@@ -1809,11 +1816,15 @@ export default function AdminDashboard() {
     const savedToken = sessionStorage.getItem(ADMIN_STORAGE_KEY);
     const savedEmail = sessionStorage.getItem(ADMIN_USER_STORAGE_KEY);
     const savedCol   = sessionStorage.getItem(ADMIN_COLLEGE_STORAGE_KEY);
+    const savedDept  = sessionStorage.getItem(ADMIN_DEPT_STORAGE_KEY);
     if (savedToken) {
       setAdminToken(savedToken);
       if (savedEmail) setAdminEmail(savedEmail);
       if (savedCol) {
         try { setAdminCollege(JSON.parse(savedCol)); } catch { /* silent */ }
+      }
+      if (savedDept) {
+        try { setAdminDepartment(JSON.parse(savedDept)); } catch { /* silent */ }
       }
       fetchAdminData(savedToken);
     }
@@ -1828,10 +1839,11 @@ export default function AdminDashboard() {
         'x-admin-password': authToken,
       };
 
-      const [qRes, sRes, lRes] = await Promise.all([
+      const [qRes, sRes, lRes, regRes] = await Promise.all([
         fetch('/api/admin/questions', { headers: authHeaders }),
         fetch('/api/admin/stats',     { headers: authHeaders }),
         fetch('/api/leaderboard?period=all-time', { headers: authHeaders }),
+        fetch('/api/admin/registration-key', { headers: authHeaders }).catch(() => null),
       ]);
 
       if (qRes.status === 401) {
@@ -1839,6 +1851,7 @@ export default function AdminDashboard() {
         sessionStorage.removeItem(ADMIN_STORAGE_KEY);
         sessionStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         sessionStorage.removeItem(ADMIN_COLLEGE_STORAGE_KEY);
+        sessionStorage.removeItem(ADMIN_DEPT_STORAGE_KEY);
         setAdminToken(null);
         setIsAuthenticated(false);
         return;
@@ -1852,10 +1865,22 @@ export default function AdminDashboard() {
           setAdminCollege(sData.college);
           sessionStorage.setItem(ADMIN_COLLEGE_STORAGE_KEY, JSON.stringify(sData.college));
         }
+        if (sData.collegeDepartment) {
+          setAdminDepartment(sData.collegeDepartment);
+          sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(sData.collegeDepartment));
+        }
         setLeaderboard(lData.leaderboard || []);
         setIsAuthenticated(true);
       } else {
         toast.error(qData.message || 'Error loading admin data.');
+      }
+
+      if (regRes && regRes.ok) {
+        const regData = await regRes.json();
+        if (regData.success && regData.department) {
+          setAdminDepartment(regData.department);
+          sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(regData.department));
+        }
       }
     } catch {
       toast.error('Network error.');
@@ -1885,6 +1910,10 @@ export default function AdminDashboard() {
           sessionStorage.setItem(ADMIN_COLLEGE_STORAGE_KEY, JSON.stringify(data.admin.college));
           setAdminCollege(data.admin.college);
         }
+        if (data.admin?.collegeDepartment) {
+          sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(data.admin.collegeDepartment));
+          setAdminDepartment(data.admin.collegeDepartment);
+        }
         setAdminToken(data.token);
         setIsAuthenticated(true);
         fetchAdminData(data.token);
@@ -1902,11 +1931,48 @@ export default function AdminDashboard() {
     sessionStorage.removeItem(ADMIN_STORAGE_KEY);
     sessionStorage.removeItem(ADMIN_USER_STORAGE_KEY);
     sessionStorage.removeItem(ADMIN_COLLEGE_STORAGE_KEY);
+    sessionStorage.removeItem(ADMIN_DEPT_STORAGE_KEY);
     setAdminToken(null);
     setAdminEmail(null);
     setAdminCollege(null);
+    setAdminDepartment(null);
     setIsAuthenticated(false);
     toast.success('Admin logged out.');
+  };
+
+  const handleUpdateRegistrationKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newKeyInput.trim()) {
+      toast.error('Registration key cannot be empty.');
+      return;
+    }
+
+    setKeyUpdating(true);
+    try {
+      const res = await fetch('/api/admin/registration-key', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': adminToken || '',
+          'x-admin-password': adminToken || '',
+        },
+        body: JSON.stringify({ registrationKey: newKeyInput.trim() }),
+      });
+      const data = await res.json();
+      if (data.success && data.department) {
+        setAdminDepartment(data.department);
+        sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(data.department));
+        setKeyModalOpen(false);
+        setNewKeyInput('');
+        toast.success(data.message || 'Registration key updated successfully!');
+      } else {
+        toast.error(data.message || 'Failed to update registration key.');
+      }
+    } catch {
+      toast.error('Network error updating registration key.');
+    } finally {
+      setKeyUpdating(false);
+    }
   };
 
 
@@ -2135,13 +2201,19 @@ export default function AdminDashboard() {
                 </span>
               )}
               {adminCollege && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                   <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   {adminCollege.name}
+                  {adminDepartment?.departmentName && (
+                    <>
+                      <span className="text-amber-400 font-normal">/</span>
+                      <span className="text-amber-900 dark:text-amber-200">{adminDepartment.departmentName}</span>
+                    </>
+                  )}
                 </span>
               )}
             </div>
-            <p className="page-subtitle">Manage questions, monitor activity, and view institution-scoped reports.</p>
+            <p className="page-subtitle">Manage questions, monitor activity, and view department-scoped reports.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {adminTab === 'questions' && (
@@ -2166,6 +2238,48 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Registration Key Banner (for Department Admins) */}
+      {adminDepartment && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-slate-800/80 dark:to-slate-800/40 border border-blue-200/80 dark:border-slate-700 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/80 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Department Registration Key</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">Active</span>
+              </div>
+              <p className="text-base font-mono font-extrabold text-slate-900 dark:text-white mt-0.5 tracking-wider">
+                {adminDepartment.registrationKey}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(adminDepartment.registrationKey);
+                toast.success('Registration key copied to clipboard!');
+              }}
+              className="btn btn-secondary btn-xs gap-1.5 flex-1 sm:flex-initial"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copy Key</span>
+            </button>
+            <button
+              onClick={() => {
+                setNewKeyInput(adminDepartment.registrationKey);
+                setKeyModalOpen(true);
+              }}
+              className="btn btn-primary btn-xs gap-1.5 flex-1 sm:flex-initial"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Change Key</span>
+            </button>
+          </div>
+        </div>
+      )}
 
 
       {/* KPI strip — always visible */}
@@ -2375,15 +2489,79 @@ export default function AdminDashboard() {
       )}
     </div>
 
-    {/* Modals */}
-    {modalOpen    && <QuestionModal editingId={editingId} formData={formData} setFormData={setFormData} onSave={handleSaveQuestion} onClose={() => setModalOpen(false)} saving={formSaving} />}
-    {deleteTarget && <DeleteModal item={deleteTarget} onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)} />}
-    {bulkOpen     && <BulkModal step={bulkStep} action={bulkAction} count={selectedIds.size} eligible={selectedIds.size} results={bulkResults}
-      onAction={a => { setBulkAction(a); setBulkStep('configure'); }}
-      onConfirm={() => { if (bulkStep === 'configure' || bulkStep === 'select') setBulkStep('confirm'); else if (bulkStep === 'confirm') executeBulk(); }}
-      onCancel={() => { if (bulkStep === 'confirm') setBulkStep('configure'); else { setBulkOpen(false); setBulkStep('select'); } }}
-      onClose={() => { setBulkOpen(false); setBulkStep('select'); setBulkResults(undefined); }}
-    />}
+    {/* Registration Key Modal */}
+    {keyModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Change Registration Key</h3>
+            </div>
+            <button onClick={() => setKeyModalOpen(false)} className="btn-icon">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleUpdateRegistrationKey} className="p-5 space-y-4">
+            <div>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                Department: <strong className="text-slate-900 dark:text-white">{adminDepartment?.departmentName}</strong>
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Current Key: <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-slate-800 dark:text-slate-200">{adminDepartment?.registrationKey}</code>
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="newRegKey" className="field-label">
+                New Registration Key <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="newRegKey"
+                type="text"
+                value={newKeyInput}
+                onChange={e => setNewKeyInput(e.target.value)}
+                placeholder="e.g. MITCSE2027 or CSE-NEW"
+                className="field-input"
+                autoFocus
+              />
+              <p className="field-helper text-[11px] mt-1">
+                You can choose any custom string (alphabetic, numbers, symbols, spaces). No minimum length or complexity required.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-200 space-y-1">
+              <p className="font-bold flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                Permanent Student Association
+              </p>
+              <p className="leading-relaxed">
+                Changing this key only affects NEW registrations. All existing students already registered in this department will remain permanently associated and their quiz records will not be changed.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setKeyModalOpen(false)}
+                className="btn btn-secondary btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={keyUpdating || !newKeyInput.trim()}
+                className="btn btn-primary btn-sm gap-1.5"
+              >
+                {keyUpdating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Save New Key</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
     </>
   );
 }

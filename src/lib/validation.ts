@@ -18,10 +18,8 @@ export const QuizSubmissionSchema = z.object({
     errorMap: () => ({ message: 'Selected option must be A, B, C, or D.' }),
   }),
   selectedOptionText: z.string().min(1, 'Selected option text is required.'),
-  // Stateless signed token for serverless fallback (session may not exist in memory on a different instance)
   sessionToken: z.string().optional(),
 });
-
 
 // Question Bank CRUD validation
 export const QuestionSchema = z.object({
@@ -65,8 +63,41 @@ export const ProfileSchema = z.object({
   emailType: z.enum(['college', 'personal'], {
     errorMap: () => ({ message: 'Email type must be college or personal.' }),
   }).default('college'),
+  registrationKey: z.string().trim().optional(),
   collegeName: z.string().trim().optional(),
   password: z.string().optional(),
+});
+
+// Registration Key Validation Schema
+export const RegistrationKeyValidateSchema = z.object({
+  registrationKey: z
+    .string({ required_error: 'Registration key is required.' })
+    .trim()
+    .min(1, 'Registration key cannot be empty.'),
+});
+
+// Registration Key Update Schema (for Admin)
+export const RegistrationKeyUpdateSchema = z.object({
+  registrationKey: z
+    .string({ required_error: 'New registration key is required.' })
+    .trim()
+    .min(1, 'Registration key cannot be empty.')
+    .max(100, 'Registration key must be at most 100 characters.'),
+});
+
+// Department Schema for Super Admin
+export const DepartmentSchema = z.object({
+  collegeId: z.coerce.number().int().positive('College is required.'),
+  departmentName: z
+    .string({ required_error: 'Department name is required.' })
+    .trim()
+    .min(1, 'Department name is required.')
+    .max(150, 'Department name must be at most 150 characters.'),
+  registrationKey: z
+    .string({ required_error: 'Registration key is required.' })
+    .trim()
+    .min(1, 'Registration key is required.')
+    .max(100, 'Registration key must be at most 100 characters.'),
 });
 
 // College Schema for Super Admin
@@ -93,8 +124,7 @@ export const AdminCreateSchema = z.object({
     .email('Admin username must be a valid email address.'),
   name: z.string().trim().optional(),
   password: z.string().min(6, 'Password must be at least 6 characters long.'),
-  collegeId: z.coerce.number({ required_error: 'College selection is required.' }).int().positive('Please select a valid college.'),
+  collegeId: z.coerce.number().int().positive('Please select a valid college.').optional(),
+  collegeDepartmentId: z.coerce.number().int().positive('Please select a valid department.').optional(),
   active: z.boolean().default(true),
 });
-
-

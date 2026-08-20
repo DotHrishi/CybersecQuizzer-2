@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
     // 1. Check database for created Admin User
     const admin = await dataService.getAdminByEmail(cleanIdentifier);
 
-
     if (admin) {
       if (!admin.active) {
         return NextResponse.json(
@@ -44,12 +43,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const collegeName = admin.collegeDepartment?.college?.name || admin.college?.name || null;
+      const departmentName = admin.collegeDepartment?.departmentName || null;
+
       const token = signAdminToken({
         id: admin.id,
         email: admin.email,
         name: admin.name,
         collegeId: admin.collegeId,
-        collegeName: admin.college?.name,
+        collegeName,
+        collegeDepartmentId: admin.collegeDepartmentId,
+        departmentName,
       });
 
       return NextResponse.json({
@@ -60,10 +64,18 @@ export async function POST(req: NextRequest) {
           email: admin.email,
           name: admin.name || admin.email,
           collegeId: admin.collegeId,
-          college: admin.college ? {
-            id: admin.college.id,
-            name: admin.college.name,
-            identifier: admin.college.identifier,
+          collegeDepartmentId: admin.collegeDepartmentId,
+          collegeName,
+          departmentName,
+          college: admin.college || admin.collegeDepartment?.college ? {
+            id: admin.collegeDepartment?.college?.id || admin.college?.id,
+            name: collegeName,
+            identifier: admin.collegeDepartment?.college?.identifier || admin.college?.identifier,
+          } : null,
+          collegeDepartment: admin.collegeDepartment ? {
+            id: admin.collegeDepartment.id,
+            departmentName: admin.collegeDepartment.departmentName,
+            registrationKey: admin.collegeDepartment.registrationKey,
           } : null,
         },
         message: 'Admin authenticated successfully.',
@@ -91,12 +103,13 @@ export async function POST(req: NextRequest) {
           email: 'admin',
           name: 'Administrator',
           collegeId: null,
+          collegeDepartmentId: null,
           college: null,
+          collegeDepartment: null,
         },
         message: 'Admin authenticated successfully.',
       });
     }
-
 
     return NextResponse.json(
       { success: false, message: 'Invalid email or password.' },

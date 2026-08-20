@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import {
   isCollegeNameMatch,
   normalizeCollegeName,
+  normalizeRegistrationKey,
   DUMMY_COLLEGE_NAME,
   DUMMY_COLLEGE_IDENTIFIER,
 } from './collegeNormalization';
@@ -396,10 +397,18 @@ export const dataService = {
     try {
       const colleges = await db.college.findMany({
         include: {
+          departments: {
+            select: {
+              id: true,
+              departmentName: true,
+              registrationKey: true,
+            },
+          },
           _count: {
             select: {
               students: true,
               admins: true,
+              departments: true,
             },
           },
         },
@@ -412,8 +421,10 @@ export const dataService = {
         identifier: c.identifier,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
+        departmentCount: c._count.departments,
         studentCount: c._count.students,
         adminCount: c._count.admins,
+        departments: c.departments,
       }));
     } catch (dbErr) {
       console.error('Prisma getAllColleges fallback failed:', dbErr);
@@ -425,6 +436,9 @@ export const dataService = {
     try {
       return await db.college.findUnique({
         where: { id },
+        include: {
+          departments: true,
+        },
       });
     } catch (dbErr) {
       console.error('Prisma getCollegeById failed:', dbErr);
@@ -437,6 +451,9 @@ export const dataService = {
     try {
       return await db.college.findUnique({
         where: { identifier: clean },
+        include: {
+          departments: true,
+        },
       });
     } catch (dbErr) {
       console.error('Prisma getCollegeByIdentifier failed:', dbErr);
@@ -449,8 +466,11 @@ export const dataService = {
     if (!norm) return null;
 
     try {
-      // First try exact case match or lowercase match
-      const allColleges = await db.college.findMany();
+      const allColleges = await db.college.findMany({
+        include: {
+          departments: true,
+        },
+      });
       const match = allColleges.find(c => isCollegeNameMatch(norm, c.name));
       return match || null;
     } catch (dbErr) {
@@ -494,7 +514,6 @@ export const dataService = {
 
   async deleteCollege(id: number) {
     try {
-      // Check if dummy college
       const college = await db.college.findUnique({ where: { id } });
       if (college && (college.identifier === DUMMY_COLLEGE_IDENTIFIER || college.name === DUMMY_COLLEGE_NAME)) {
         throw new Error('System placeholder dummy college cannot be deleted.');
@@ -508,7 +527,210 @@ export const dataService = {
     }
   },
 
-  /* ─── Student Profile & College Association ─────────────── */
+  /* ─── College Department & Registration Key Management ───── */
+  async findDepartmentByRegistrationKey(key: string) {
+    const cleanKey = normalizeRegistrationKey(key);
+    if (!cleanKey) return null;
+
+    try {
+      // Find matching department by unique registration key (case-insensitive fallback)
+      const department = await db.collegeDepartment.findUnique({
+        where: { registrationKey: cleanKey },
+        include: {
+          college: true,
+        },
+      });
+
+      if (department) return department;
+
+      // Fallback: search all in case of case-insensitive match
+      const all = await db.collegeDepartment.findMany({
+        include: { college: true },
+      });
+      return all.find(d => d.registrationKey.trim().toLowerCase() === cleanKey.toLowerCase()) || null;
+    } catch (dbErr) {
+      console.error('Prisma findDepartmentByRegistrationKey failed:', dbErr);
+      return null;
+    }
+  },
+
+  async getDepartmentById(id: number) {
+    try {
+      return await db.collegeDepartment.findUnique({
+        where: { id },
+        include: {
+          college: true,
+          _count: {
+            select: {
+              students: true,
+              admins: true,
+            },
+          },
+        },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getDepartmentById failed:', dbErr);
+      return null;
+    }
+  },
+
+  async getDepartmentsByCollege(collegeId: number) {
+    try {
+      const departments = await db.collegeDepartment.findMany({
+        where: { collegeId },
+        include: {
+          college: true,
+          _count: {
+            select: {
+              students: true,
+              admins: true,
+            },
+          },
+        },
+        orderBy: { departmentName: 'asc' },
+      });
+
+      return departments.map(d => ({
+        id: d.id,
+        collegeId: d.collegeId,
+        departmentName: d.departmentName,
+        registrationKey: d.registrationKey,
+        college: d.college,
+        studentCount: d._count?.students || 0,
+        adminCount: d._count?.admins || 0,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+      }));
+    } catch (dbErr) {
+      console.error('Prisma getDepartmentsByCollege failed:', dbErr);
+      return [];
+    }
+  },
+
+  async getAllDepartments() {
+    try {
+      const departments = await db.collegeDepartment.findMany({
+        include: {
+          college: true,
+          _count: {
+            select: {
+              students: true,
+              admins: true,
+            },
+          },
+        },
+        orderBy: [{ college: { name: 'asc' } }, { departmentName: 'asc' }],
+      });
+
+      return departments.map(d => ({
+        id: d.id,
+        collegeId: d.collegeId,
+        departmentName: d.departmentName,
+        registrationKey: d.registrationKey,
+        college: d.college,
+        studentCount: d._count?.students || 0,
+        adminCount: d._count?.admins || 0,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+      }));
+    } catch (dbErr) {
+      console.error('Prisma getAllDepartments failed:', dbErr);
+      return [];
+    }
+  },
+
+  async createDepartment(data: { collegeId: number; departmentName: string; registrationKey: string }) {
+    const cleanKey = normalizeRegistrationKey(data.registrationKey);
+    const cleanName = data.departmentName.trim();
+
+    try {
+      // Check if registration key already in use
+      const existingKey = await this.findDepartmentByRegistrationKey(cleanKey);
+      if (existingKey) {
+        throw new Error(`Registration key "${cleanKey}" is already in use by another department.`);
+      }
+
+      return await db.collegeDepartment.create({
+        data: {
+          collegeId: data.collegeId,
+          departmentName: cleanName,
+          registrationKey: cleanKey,
+        },
+        include: {
+          college: true,
+        },
+      });
+    } catch (dbErr) {
+      console.error('Prisma createDepartment failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  async updateDepartment(id: number, data: { departmentName?: string; registrationKey?: string }) {
+    const payload: any = { updatedAt: new Date() };
+    if (data.departmentName !== undefined) payload.departmentName = data.departmentName.trim();
+    if (data.registrationKey !== undefined) {
+      const cleanKey = normalizeRegistrationKey(data.registrationKey);
+      const existing = await this.findDepartmentByRegistrationKey(cleanKey);
+      if (existing && existing.id !== id) {
+        throw new Error(`Registration key "${cleanKey}" is already in use by another department.`);
+      }
+      payload.registrationKey = cleanKey;
+    }
+
+    try {
+      return await db.collegeDepartment.update({
+        where: { id },
+        data: payload,
+        include: {
+          college: true,
+        },
+      });
+    } catch (dbErr) {
+      console.error('Prisma updateDepartment failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  async updateRegistrationKey(departmentId: number, newRegistrationKey: string) {
+    const cleanKey = normalizeRegistrationKey(newRegistrationKey);
+    if (!cleanKey) {
+      throw new Error('Registration key cannot be empty.');
+    }
+
+    const existing = await this.findDepartmentByRegistrationKey(cleanKey);
+    if (existing && existing.id !== departmentId) {
+      throw new Error(`Registration key "${cleanKey}" is already in use.`);
+    }
+
+    try {
+      return await db.collegeDepartment.update({
+        where: { id: departmentId },
+        data: {
+          registrationKey: cleanKey,
+          updatedAt: new Date(),
+        },
+        include: {
+          college: true,
+        },
+      });
+    } catch (dbErr) {
+      console.error('Prisma updateRegistrationKey failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  async deleteDepartment(id: number) {
+    try {
+      await db.collegeDepartment.delete({ where: { id } });
+      return true;
+    } catch (dbErr) {
+      console.error('Prisma deleteDepartment failed:', dbErr);
+      throw dbErr;
+    }
+  },
+
+  /* ─── Student Profile & Registration Key Association ─────── */
   async getUserProfile(nickname: string) {
     const cleanNick = nickname.trim();
     try {
@@ -516,6 +738,11 @@ export const dataService = {
         where: { nickname: cleanNick },
         include: {
           college: true,
+          collegeDepartment: {
+            include: {
+              college: true,
+            },
+          },
         },
       });
     } catch (dbErr) {
@@ -530,14 +757,24 @@ export const dataService = {
     isNicknameSame: boolean;
     email: string;
     emailType: 'college' | 'personal';
+    registrationKey?: string;
     collegeId?: number;
     passwordHash?: string;
   }) {
-    let resolvedCollegeId = profileData.collegeId;
+    const cleanNick = profileData.nickname.trim();
+    const existing = await this.getUserProfile(cleanNick);
 
-    if (!resolvedCollegeId) {
-      const dummy = await this.getOrCreateDummyCollege();
-      resolvedCollegeId = dummy.id;
+    let resolvedDepartmentId: number | null = existing?.collegeDepartmentId || null;
+    let resolvedCollegeId: number | null = existing?.collegeId || null;
+
+    // Authoritative lookup: If registrationKey provided, resolve college_department
+    if (profileData.registrationKey && profileData.registrationKey.trim().length > 0) {
+      const dept = await this.findDepartmentByRegistrationKey(profileData.registrationKey);
+      if (!dept) {
+        throw new Error('Invalid registration key. Please enter a valid key provided by your administrator.');
+      }
+      resolvedDepartmentId = dept.id;
+      resolvedCollegeId = dept.collegeId;
     }
 
     const updateData: any = {
@@ -545,34 +782,46 @@ export const dataService = {
       isNicknameSame: profileData.isNicknameSame,
       email: profileData.email.trim().toLowerCase(),
       emailType: profileData.emailType,
-      collegeId: resolvedCollegeId,
+      updatedAt: new Date(),
     };
 
+    if (resolvedDepartmentId !== null) {
+      updateData.collegeDepartmentId = resolvedDepartmentId;
+    }
+    if (resolvedCollegeId !== null) {
+      updateData.collegeId = resolvedCollegeId;
+    }
     if (profileData.passwordHash) {
       updateData.passwordHash = profileData.passwordHash;
     }
 
     const createData: any = {
       fullName: profileData.fullName.trim(),
-      nickname: profileData.nickname.trim(),
+      nickname: cleanNick,
       isNicknameSame: profileData.isNicknameSame,
       email: profileData.email.trim().toLowerCase(),
       emailType: profileData.emailType,
       collegeId: resolvedCollegeId,
+      collegeDepartmentId: resolvedDepartmentId,
       passwordHash: profileData.passwordHash || null,
     };
 
     try {
       return await db.userProfile.upsert({
-        where: { nickname: profileData.nickname.trim() },
+        where: { nickname: cleanNick },
         update: updateData,
         create: createData,
         include: {
           college: true,
+          collegeDepartment: {
+            include: {
+              college: true,
+            },
+          },
         },
       });
     } catch (dbErr) {
-      console.error('Prisma upsertUserProfile fallback failed:', dbErr);
+      console.error('Prisma upsertUserProfile failed:', dbErr);
       throw dbErr;
     }
   },
@@ -589,41 +838,54 @@ export const dataService = {
     }
   },
 
-  /* ─── College-Scoped Queries for Admins & Reports ────────── */
-  async getStudentsByCollege(collegeId?: number | null) {
+  /* ─── Scoped Queries for Admins & Reports ────────────────── */
+  async getStudentsByScope(scope?: { collegeId?: number | null; collegeDepartmentId?: number | null }) {
     try {
-      const whereClause = collegeId ? { collegeId } : {};
+      const whereClause: any = {};
+      if (scope?.collegeDepartmentId) {
+        whereClause.collegeDepartmentId = scope.collegeDepartmentId;
+      } else if (scope?.collegeId) {
+        whereClause.OR = [
+          { collegeId: scope.collegeId },
+          { collegeDepartment: { collegeId: scope.collegeId } },
+        ];
+      }
+
       return await db.userProfile.findMany({
         where: whereClause,
         include: {
           college: {
             select: { id: true, name: true, identifier: true },
           },
+          collegeDepartment: {
+            select: {
+              id: true,
+              departmentName: true,
+              registrationKey: true,
+              college: { select: { id: true, name: true, identifier: true } },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
     } catch (dbErr) {
-      console.error('Prisma getStudentsByCollege failed:', dbErr);
+      console.error('Prisma getStudentsByScope failed:', dbErr);
       return [];
     }
   },
 
-  async getAttemptsByCollege(collegeId?: number | null) {
+  async getAttemptsByScope(scope?: { collegeId?: number | null; collegeDepartmentId?: number | null }) {
     try {
-      if (!collegeId) {
+      if (!scope?.collegeId && !scope?.collegeDepartmentId) {
         // Super admin - return all attempts
         return await db.userAttempt.findMany({
           orderBy: { createdAt: 'desc' },
         });
       }
 
-      // Filter attempts belonging only to students of the specified college
-      const collegeStudents = await db.userProfile.findMany({
-        where: { collegeId },
-        select: { nickname: true },
-      });
-
-      const nicknames = collegeStudents.map(s => s.nickname.toLowerCase());
+      // Filter attempts belonging only to students of the specified scope
+      const students = await this.getStudentsByScope(scope);
+      const nicknames = students.map(s => s.nickname.toLowerCase());
       if (nicknames.length === 0) return [];
 
       const allAttempts = await db.userAttempt.findMany({
@@ -632,21 +894,21 @@ export const dataService = {
 
       return allAttempts.filter(a => nicknames.includes(a.userName.trim().toLowerCase()));
     } catch (dbErr) {
-      console.error('Prisma getAttemptsByCollege failed:', dbErr);
+      console.error('Prisma getAttemptsByScope failed:', dbErr);
       return [];
     }
   },
 
-  async getStatsByCollege(collegeId?: number | null) {
+  async getStatsByScope(scope?: { collegeId?: number | null; collegeDepartmentId?: number | null }) {
     try {
       const questions = await this.getAllQuestions();
       const totalQuestions = questions.length;
       const activeQuestions = questions.filter((q: any) => q.active).length;
 
-      const attempts = await this.getAttemptsByCollege(collegeId);
+      const attempts = await this.getAttemptsByScope(scope);
       const totalAttempts = attempts.length;
 
-      const students = await this.getStudentsByCollege(collegeId);
+      const students = await this.getStudentsByScope(scope);
       const totalUsers = students.length > 0
         ? students.length
         : new Set(attempts.map((a: any) => a.userName.toLowerCase())).size;
@@ -663,12 +925,15 @@ export const dataService = {
         todayAttempts,
       };
     } catch (dbErr) {
-      console.error('Prisma getStatsByCollege failed:', dbErr);
+      console.error('Prisma getStatsByScope failed:', dbErr);
       throw dbErr;
     }
   },
 
-  async getLeaderboardByCollege(collegeId?: number | null, period = 'daily') {
+  async getLeaderboardByScope(
+    scope?: { collegeId?: number | null; collegeDepartmentId?: number | null },
+    period = 'daily'
+  ) {
     const cleanPeriod = (period || 'daily').toLowerCase().replace('-', '');
     const now = new Date();
     const year = now.getFullYear();
@@ -692,7 +957,7 @@ export const dataService = {
     }
 
     try {
-      const attempts = await this.getAttemptsByCollege(collegeId);
+      const attempts = await this.getAttemptsByScope(scope);
       const filtered = attempts.filter((a: any) => {
         if (cleanPeriod === 'daily') return a.quizDate === todayStr;
         if (cleanPeriod === 'alltime') return true;
@@ -755,9 +1020,26 @@ export const dataService = {
         ...item,
       }));
     } catch (dbErr) {
-      console.error('Prisma getLeaderboardByCollege failed:', dbErr);
+      console.error('Prisma getLeaderboardByScope failed:', dbErr);
       return [];
     }
+  },
+
+  // Backward compatibility aliases
+  async getStudentsByCollege(collegeId?: number | null) {
+    return this.getStudentsByScope({ collegeId });
+  },
+
+  async getAttemptsByCollege(collegeId?: number | null) {
+    return this.getAttemptsByScope({ collegeId });
+  },
+
+  async getStatsByCollege(collegeId?: number | null) {
+    return this.getStatsByScope({ collegeId });
+  },
+
+  async getLeaderboardByCollege(collegeId?: number | null, period = 'daily') {
+    return this.getLeaderboardByScope({ collegeId }, period);
   },
 
   /* ─── Admin Users Management (Super Admin & Admin Auth) ─── */
@@ -768,6 +1050,11 @@ export const dataService = {
         where: { email: { equals: cleanEmail } },
         include: {
           college: true,
+          collegeDepartment: {
+            include: {
+              college: true,
+            },
+          },
         },
       });
     } catch (dbErr) {
@@ -782,6 +1069,11 @@ export const dataService = {
         where: { id },
         include: {
           college: true,
+          collegeDepartment: {
+            include: {
+              college: true,
+            },
+          },
         },
       });
     } catch (dbErr) {
@@ -799,11 +1091,26 @@ export const dataService = {
           name: true,
           active: true,
           collegeId: true,
+          collegeDepartmentId: true,
           college: {
             select: {
               id: true,
               name: true,
               identifier: true,
+            },
+          },
+          collegeDepartment: {
+            select: {
+              id: true,
+              departmentName: true,
+              registrationKey: true,
+              college: {
+                select: {
+                  id: true,
+                  name: true,
+                  identifier: true,
+                },
+              },
             },
           },
           createdAt: true,
@@ -817,13 +1124,27 @@ export const dataService = {
     }
   },
 
-  async createAdmin(data: { email: string; passwordHash: string; name?: string; active?: boolean; collegeId?: number }) {
+  async createAdmin(data: {
+    email: string;
+    passwordHash: string;
+    name?: string;
+    active?: boolean;
+    collegeId?: number;
+    collegeDepartmentId?: number;
+  }) {
+    let resolvedCollegeId = data.collegeId || null;
+    if (data.collegeDepartmentId && !resolvedCollegeId) {
+      const dept = await db.collegeDepartment.findUnique({ where: { id: data.collegeDepartmentId } });
+      if (dept) resolvedCollegeId = dept.collegeId;
+    }
+
     const payload: any = {
       email: data.email.trim().toLowerCase(),
       passwordHash: data.passwordHash,
       name: data.name?.trim() || null,
       active: data.active ?? true,
-      collegeId: data.collegeId || null,
+      collegeId: resolvedCollegeId,
+      collegeDepartmentId: data.collegeDepartmentId || null,
     };
 
     try {
@@ -835,8 +1156,17 @@ export const dataService = {
           name: true,
           active: true,
           collegeId: true,
+          collegeDepartmentId: true,
           college: {
             select: { id: true, name: true, identifier: true },
+          },
+          collegeDepartment: {
+            select: {
+              id: true,
+              departmentName: true,
+              registrationKey: true,
+              college: { select: { id: true, name: true, identifier: true } },
+            },
           },
           createdAt: true,
           updatedAt: true,
@@ -848,7 +1178,16 @@ export const dataService = {
     }
   },
 
-  async updateAdmin(id: number, data: { name?: string; active?: boolean; passwordHash?: string; collegeId?: number }) {
+  async updateAdmin(
+    id: number,
+    data: {
+      name?: string;
+      active?: boolean;
+      passwordHash?: string;
+      collegeId?: number | null;
+      collegeDepartmentId?: number | null;
+    }
+  ) {
     const payload: any = {
       updatedAt: new Date(),
     };
@@ -856,6 +1195,13 @@ export const dataService = {
     if (data.active !== undefined) payload.active = data.active;
     if (data.passwordHash !== undefined) payload.passwordHash = data.passwordHash;
     if (data.collegeId !== undefined) payload.collegeId = data.collegeId;
+    if (data.collegeDepartmentId !== undefined) {
+      payload.collegeDepartmentId = data.collegeDepartmentId;
+      if (data.collegeDepartmentId && !data.collegeId) {
+        const dept = await db.collegeDepartment.findUnique({ where: { id: data.collegeDepartmentId } });
+        if (dept) payload.collegeId = dept.collegeId;
+      }
+    }
 
     try {
       return await db.adminUser.update({
@@ -867,8 +1213,17 @@ export const dataService = {
           name: true,
           active: true,
           collegeId: true,
+          collegeDepartmentId: true,
           college: {
             select: { id: true, name: true, identifier: true },
+          },
+          collegeDepartment: {
+            select: {
+              id: true,
+              departmentName: true,
+              registrationKey: true,
+              college: { select: { id: true, name: true, identifier: true } },
+            },
           },
           createdAt: true,
           updatedAt: true,

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { createHmac, randomBytes, scryptSync } from 'crypto';
+import { randomBytes, scryptSync } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -286,13 +286,63 @@ async function main() {
   });
   console.log('Colleges seeded: Dummy, MIT-WPU, COEP, SIT.');
 
-  // 3. Seed Admins
+  // 3. Seed Departments with Registration Keys
+  console.log('Seeding departments & registration keys...');
+  const mitCse = await prisma.collegeDepartment.upsert({
+    where: {
+      collegeId_departmentName: {
+        collegeId: mitCollege.id,
+        departmentName: 'Computer Science & Engineering',
+      },
+    },
+    update: { registrationKey: 'MITCSE2026' },
+    create: {
+      collegeId: mitCollege.id,
+      departmentName: 'Computer Science & Engineering',
+      registrationKey: 'MITCSE2026',
+    },
+  });
+
+  const mitIt = await prisma.collegeDepartment.upsert({
+    where: {
+      collegeId_departmentName: {
+        collegeId: mitCollege.id,
+        departmentName: 'Information Technology',
+      },
+    },
+    update: { registrationKey: 'MITIT2026' },
+    create: {
+      collegeId: mitCollege.id,
+      departmentName: 'Information Technology',
+      registrationKey: 'MITIT2026',
+    },
+  });
+
+  const coepCse = await prisma.collegeDepartment.upsert({
+    where: {
+      collegeId_departmentName: {
+        collegeId: coepCollege.id,
+        departmentName: 'Computer Engineering',
+      },
+    },
+    update: { registrationKey: 'COEPCSE' },
+    create: {
+      collegeId: coepCollege.id,
+      departmentName: 'Computer Engineering',
+      registrationKey: 'COEPCSE',
+    },
+  });
+
+  console.log('Departments seeded with keys: MITCSE2026, MITIT2026, COEPCSE.');
+
+  // 4. Seed Admins
   console.log('Seeding admin accounts...');
   // Super Admin
   await prisma.adminUser.upsert({
     where: { email: 'superadmin@cybersec.org' },
     update: {
       collegeId: null,
+      collegeDepartmentId: null,
       passwordHash: hashPassword('SuperAdmin@123'),
       active: true,
     },
@@ -301,69 +351,78 @@ async function main() {
       name: 'Chief Super Admin',
       passwordHash: hashPassword('SuperAdmin@123'),
       collegeId: null,
+      collegeDepartmentId: null,
       active: true,
     },
   });
 
-  // MIT School Admin
+  // MIT Department Admin (Computer Science)
+  await prisma.adminUser.upsert({
+    where: { email: 'admin.mitcse@wpu.edu.in' },
+    update: {
+      collegeId: mitCollege.id,
+      collegeDepartmentId: mitCse.id,
+      passwordHash: hashPassword('AdminMit@123'),
+      active: true,
+    },
+    create: {
+      email: 'admin.mitcse@wpu.edu.in',
+      name: 'MIT CSE Department Admin',
+      passwordHash: hashPassword('AdminMit@123'),
+      collegeId: mitCollege.id,
+      collegeDepartmentId: mitCse.id,
+      active: true,
+    },
+  });
+
+  // MIT College-Wide Admin
   await prisma.adminUser.upsert({
     where: { email: 'admin.mit@wpu.edu.in' },
     update: {
       collegeId: mitCollege.id,
+      collegeDepartmentId: null,
       passwordHash: hashPassword('AdminMit@123'),
       active: true,
     },
     create: {
       email: 'admin.mit@wpu.edu.in',
-      name: 'MIT Admin Officer',
+      name: 'MIT Overall Admin Officer',
       passwordHash: hashPassword('AdminMit@123'),
       collegeId: mitCollege.id,
+      collegeDepartmentId: null,
       active: true,
     },
   });
 
-  // COEP School Admin
+  // COEP Department Admin (CSE)
   await prisma.adminUser.upsert({
     where: { email: 'admin.coep@coep.ac.in' },
     update: {
       collegeId: coepCollege.id,
+      collegeDepartmentId: coepCse.id,
       passwordHash: hashPassword('AdminCoep@123'),
       active: true,
     },
     create: {
       email: 'admin.coep@coep.ac.in',
-      name: 'COEP Admin Officer',
+      name: 'COEP CSE Admin Officer',
       passwordHash: hashPassword('AdminCoep@123'),
       collegeId: coepCollege.id,
+      collegeDepartmentId: coepCse.id,
       active: true,
     },
   });
 
-  // SIT School Admin
-  await prisma.adminUser.upsert({
-    where: { email: 'admin.sit@sitpune.edu.in' },
-    update: {
-      collegeId: sitCollege.id,
-      passwordHash: hashPassword('AdminSit@123'),
-      active: true,
-    },
-    create: {
-      email: 'admin.sit@sitpune.edu.in',
-      name: 'SIT Admin Officer',
-      passwordHash: hashPassword('AdminSit@123'),
-      collegeId: sitCollege.id,
-      active: true,
-    },
-  });
-  console.log('Admins seeded: Super Admin, MIT Admin, COEP Admin, SIT Admin.');
+  console.log('Admins seeded: Super Admin, MIT CSE Admin, MIT Overall Admin, COEP Admin.');
 
-  // 4. Seed Students
+  // 5. Seed Students
   console.log('Seeding student profiles...');
-  // MIT Student
+  // MIT CSE Student
   await prisma.userProfile.upsert({
     where: { nickname: 'alex_mit' },
     update: {
       collegeId: mitCollege.id,
+      collegeDepartmentId: mitCse.id,
       passwordHash: hashPassword('StudentMit@123'),
     },
     create: {
@@ -371,15 +430,17 @@ async function main() {
       fullName: 'Alex Mitchell',
       email: 'alex.mit@wpu.edu.in',
       collegeId: mitCollege.id,
+      collegeDepartmentId: mitCse.id,
       passwordHash: hashPassword('StudentMit@123'),
     },
   });
 
-  // COEP Student
+  // COEP CSE Student
   await prisma.userProfile.upsert({
     where: { nickname: 'rachel_coep' },
     update: {
       collegeId: coepCollege.id,
+      collegeDepartmentId: coepCse.id,
       passwordHash: hashPassword('StudentCoep@123'),
     },
     create: {
@@ -387,6 +448,7 @@ async function main() {
       fullName: 'Rachel COEP',
       email: 'rachel.coep@coep.ac.in',
       collegeId: coepCollege.id,
+      collegeDepartmentId: coepCse.id,
       passwordHash: hashPassword('StudentCoep@123'),
     },
   });
@@ -396,6 +458,7 @@ async function main() {
     where: { nickname: 'new_student_grace' },
     update: {
       collegeId: dummyCollege.id,
+      collegeDepartmentId: null,
       passwordHash: null,
     },
     create: {
@@ -403,8 +466,9 @@ async function main() {
       fullName: 'Grace Period Student',
       email: 'grace.student@example.com',
       collegeId: dummyCollege.id,
+      collegeDepartmentId: null,
       passwordHash: null,
-      createdAt: new Date(), // Just created, well within 5 days
+      createdAt: new Date(),
     },
   });
 

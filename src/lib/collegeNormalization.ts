@@ -1,18 +1,35 @@
 /**
- * Utility functions for college name normalization, exact matching,
- * and student password policy validation.
+ * Utility functions for college & department registration key handling,
+ * grace period calculation, and student password policy validation.
  */
 
 export const DUMMY_COLLEGE_NAME = 'Enter-your-college';
 export const DUMMY_COLLEGE_IDENTIFIER = 'DUMMY';
+export const UNASSIGNED_DEPARTMENT_NAME = 'Unassigned';
 export const STUDENT_GRACE_PERIOD_DAYS = 5;
 
 /**
- * Normalizes a college name for comparison:
- * - Unicode NFKC normalization
- * - Trims leading and trailing whitespace
- * - Collapses consecutive spaces/tabs into a single space
- * - Strips harmless trailing punctuation (e.g. '.', ',', ';', '-')
+ * Normalizes a registration key (trims leading/trailing whitespace).
+ * Registration keys are NOT passwords; any characters are permitted.
+ */
+export function normalizeRegistrationKey(input: string | null | undefined): string {
+  if (!input || typeof input !== 'string') return '';
+  return input.trim();
+}
+
+/**
+ * Validates registration key presence.
+ * There is NO password-style complexity check (letters, numbers, special characters, spaces allowed).
+ */
+export function validateRegistrationKeyFormat(key: string | null | undefined): { isValid: boolean; message?: string } {
+  if (!key || typeof key !== 'string' || key.trim().length === 0) {
+    return { isValid: false, message: 'Registration key is required.' };
+  }
+  return { isValid: true };
+}
+
+/**
+ * Normalizes a college name for backward compatibility and admin CRUD.
  */
 export function normalizeCollegeName(input: string | null | undefined): string {
   if (!input || typeof input !== 'string') return '';
@@ -20,21 +37,19 @@ export function normalizeCollegeName(input: string | null | undefined): string {
   return input
     .normalize('NFKC')
     .trim()
-    .replace(/\s+/g, ' ') // Collapse multiple whitespace to single space
-    .replace(/[\.\,\;\-]+$/, '') // Strip harmless trailing punctuation
+    .replace(/\s+/g, ' ')
+    .replace(/[\.\,\;\-]+$/, '')
     .trim();
 }
 
 /**
- * Determines if a student-entered college name matches a configured college name.
- * Uses exact match after safe normalization (case-insensitive).
+ * Determines if two college names match after normalization.
  */
-export function isCollegeNameMatch(enteredName: string, configuredName: string): boolean {
-  const normEntered = normalizeCollegeName(enteredName).toLowerCase();
-  const normConfigured = normalizeCollegeName(configuredName).toLowerCase();
-
-  if (!normEntered || !normConfigured) return false;
-  return normEntered === normConfigured;
+export function isCollegeNameMatch(a: string, b: string): boolean {
+  const normA = normalizeCollegeName(a).toLowerCase();
+  const normB = normalizeCollegeName(b).toLowerCase();
+  if (!normA || !normB) return false;
+  return normA === normB;
 }
 
 /**
@@ -53,26 +68,37 @@ export function isDummyCollege(nameOrIdentifier: string | null | undefined): boo
 
 /**
  * Calculates whether a student account is beyond the 5-day grace period.
- * Supports passing a Date, date string, or a student profile object.
+ * Supports checking both collegeDepartmentId and passwordHash.
  */
 export function getStudentGracePeriodStatus(
-  input: Date | string | { createdAt?: Date | string | null; collegeId?: number | null; college?: any; passwordHash?: string | null } | null | undefined
+  input:
+    | Date
+    | string
+    | {
+        createdAt?: Date | string | null;
+        collegeId?: number | null;
+        collegeDepartmentId?: number | null;
+        collegeDepartment?: any;
+        college?: any;
+        passwordHash?: string | null;
+      }
+    | null
+    | undefined
 ): {
   isBeyondGracePeriod: boolean;
   isWithinGracePeriod: boolean;
   requiresCollegeSetup: boolean;
+  requiresRegistrationKeySetup: boolean;
   daysRemaining: number;
   hoursRemaining: number;
 } {
   let createdAt: Date | string | null | undefined;
-  let isDummy = false;
+  let hasValidDepartment = false;
   let hasPassword = false;
 
   if (input && typeof input === 'object' && !(input instanceof Date)) {
     createdAt = input.createdAt;
-    if (input.college?.identifier === DUMMY_COLLEGE_IDENTIFIER || isDummyCollege(input.college?.name)) {
-      isDummy = true;
-    }
+    hasValidDepartment = Boolean(input.collegeDepartmentId || input.collegeDepartment?.id);
     hasPassword = Boolean(input.passwordHash);
   } else {
     createdAt = input as Date | string;
@@ -83,6 +109,7 @@ export function getStudentGracePeriodStatus(
       isBeyondGracePeriod: false,
       isWithinGracePeriod: true,
       requiresCollegeSetup: false,
+      requiresRegistrationKeySetup: false,
       daysRemaining: STUDENT_GRACE_PERIOD_DAYS,
       hoursRemaining: STUDENT_GRACE_PERIOD_DAYS * 24,
     };
@@ -98,12 +125,13 @@ export function getStudentGracePeriodStatus(
   const hoursRemaining = Math.ceil(msRemaining / (1000 * 60 * 60));
   const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
 
-  const requiresSetup = isBeyond && (isDummy || !hasPassword);
+  const requiresSetup = isBeyond && (!hasValidDepartment || !hasPassword);
 
   return {
     isBeyondGracePeriod: isBeyond,
     isWithinGracePeriod: !isBeyond,
     requiresCollegeSetup: requiresSetup,
+    requiresRegistrationKeySetup: requiresSetup,
     daysRemaining,
     hoursRemaining,
   };

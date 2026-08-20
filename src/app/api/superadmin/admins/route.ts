@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST: Add new admin account associated with a college
+// POST: Add new admin account associated with a college/department
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
   const rl = checkRateLimit(`superadmin_admins:${ip}`, 30);
@@ -52,16 +52,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email, password, name, collegeId, active } = validation.data;
+    const { email, password, name, collegeId, collegeDepartmentId, active } = validation.data;
     const cleanEmail = email.trim().toLowerCase();
 
-    // Verify college exists
-    const college = await dataService.getCollegeById(collegeId);
-    if (!college) {
-      return NextResponse.json(
-        { success: false, message: 'The selected college does not exist.' },
-        { status: 400 }
-      );
+    let targetCollegeId = collegeId;
+    let targetDepartmentName: string | undefined;
+
+    if (collegeDepartmentId) {
+      const dept = await dataService.getDepartmentById(collegeDepartmentId);
+      if (!dept) {
+        return NextResponse.json({ success: false, message: 'The selected department does not exist.' }, { status: 400 });
+      }
+      targetCollegeId = dept.collegeId;
+      targetDepartmentName = dept.departmentName;
+    } else if (collegeId) {
+      const college = await dataService.getCollegeById(collegeId);
+      if (!college) {
+        return NextResponse.json({ success: false, message: 'The selected college does not exist.' }, { status: 400 });
+      }
     }
 
     // Check if email already registered
@@ -79,13 +87,18 @@ export async function POST(req: NextRequest) {
       email: cleanEmail,
       passwordHash,
       name: name?.trim() || undefined,
-      collegeId: college.id,
+      collegeId: targetCollegeId,
+      collegeDepartmentId,
       active: active ?? true,
     });
 
+    const assignmentDesc = targetDepartmentName
+      ? `assigned to ${newAdmin.college?.name || 'College'} (${targetDepartmentName})`
+      : `assigned to ${newAdmin.college?.name || 'All Departments'}`;
+
     return NextResponse.json({
       success: true,
-      message: `Admin account for "${cleanEmail}" created successfully and assigned to ${college.name}.`,
+      message: `Admin account for "${cleanEmail}" created successfully and ${assignmentDesc}.`,
       admin: newAdmin,
     });
 
@@ -97,7 +110,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT: Update admin account status, name, college, or password
+// PUT: Update admin account status, name, college, department, or password
 export async function PUT(req: NextRequest) {
   if (!verifySuperAdminRequest(req)) {
     return NextResponse.json(
@@ -108,7 +121,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, active, name, password, collegeId } = body;
+    const { id, active, name, password, collegeId, collegeDepartmentId } = body;
 
     const adminId = Number(id);
     if (!adminId || isNaN(adminId)) {
@@ -118,7 +131,13 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const updatePayload: { name?: string; active?: boolean; passwordHash?: string; collegeId?: number } = {};
+    const updatePayload: {
+      name?: string;
+      active?: boolean;
+      passwordHash?: string;
+      collegeId?: number | null;
+      collegeDepartmentId?: number | null;
+    } = {};
 
     if (active !== undefined) {
       updatePayload.active = Boolean(active);
@@ -126,17 +145,32 @@ export async function PUT(req: NextRequest) {
     if (name !== undefined) {
       updatePayload.name = String(name).trim();
     }
-    if (collegeId !== undefined) {
-      const colId = Number(collegeId);
-      const col = await dataService.getCollegeById(colId);
-      if (!col) {
-        return NextResponse.json(
-          { success: false, message: 'Selected college not found.' },
-          { status: 400 }
-        );
+    if (collegeDepartmentId !== undefined) {
+      if (collegeDepartmentId === null) {
+        updatePayload.collegeDepartmentId = null;
+      } else {
+        const deptId = Number(collegeDepartmentId);
+        const dept = await dataService.getDepartmentById(deptId);
+        if (!dept) {
+          return NextResponse.json({ success: false, message: 'Selected department not found.' }, { status: 400 });
+        }
+        updatePayload.collegeDepartmentId = dept.id;
+        updatePayload.collegeId = dept.collegeId;
       }
-      updatePayload.collegeId = col.id;
+    } else if (collegeId !== undefined) {
+      if (collegeId === null) {
+        updatePayload.collegeId = null;
+        updatePayload.collegeDepartmentId = null;
+      } else {
+        const colId = Number(collegeId);
+        const col = await dataService.getCollegeById(colId);
+        if (!col) {
+          return NextResponse.json({ success: false, message: 'Selected college not found.' }, { status: 400 });
+        }
+        updatePayload.collegeId = col.id;
+      }
     }
+
     if (password) {
       if (typeof password !== 'string' || password.length < 6) {
         return NextResponse.json(
@@ -201,4 +235,3 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
-

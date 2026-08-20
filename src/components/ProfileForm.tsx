@@ -6,7 +6,7 @@ import {
   User, Mail, ShieldCheck, CheckCircle2, AlertCircle,
   Edit3, ArrowRight, Building2, UserCheck, RefreshCw,
   Info, Lock, ExternalLink, Save, X, Award, Sparkles, Check, Download, BookOpen,
-  Search, Copy, Eye, EyeOff
+  Search, Copy, Eye, EyeOff, KeyRound
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { UserProfileFormValues, UserBadgeInfo, UserProfileDTO } from '@/types/profile';
@@ -61,39 +61,48 @@ function ProfileField({
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════ */
 export default function ProfileForm() {
-  const [fullName, setFullName]           = useState('');
-  const [nickname, setNickname]           = useState('');
-  const [isNicknameSame, setIsNicknameSame] = useState(false);
-  const [email, setEmail]                 = useState('');
-  const [emailType, setEmailType]         = useState<'college' | 'personal'>('college');
-  const [collegeName, setCollegeName]     = useState('');
-  const [password, setPassword]           = useState('');
-  const [showPassword, setShowPassword]   = useState(false);
+  const [fullName, setFullName]                 = useState('');
+  const [nickname, setNickname]                 = useState('');
+  const [isNicknameSame, setIsNicknameSame]     = useState(false);
+  const [email, setEmail]                       = useState('');
+  const [emailType, setEmailType]               = useState<'college' | 'personal'>('college');
+  const [registrationKey, setRegistrationKey]   = useState('');
+  const [password, setPassword]                 = useState('');
+  const [showPassword, setShowPassword]         = useState(false);
 
-  const [loading, setLoading]             = useState(false);
-  const [fetching, setFetching]           = useState(true);
-  const [savedProfile, setSavedProfile]   = useState<UserProfileDTO | null>(null);
-  const [gracePeriodInfo, setGracePeriodInfo] = useState<{
+  const [loading, setLoading]                   = useState(false);
+  const [fetching, setFetching]                 = useState(true);
+  const [savedProfile, setSavedProfile]         = useState<UserProfileDTO | null>(null);
+  const [gracePeriodInfo, setGracePeriodInfo]   = useState<{
     isBeyondGracePeriod: boolean;
     daysRemaining: number;
     hoursRemaining: number;
-    requiresCollegeUpdate: boolean;
+    requiresRegistrationKeySetup: boolean;
+    requiresCollegeUpdate?: boolean;
     requiresPassword: boolean;
-    hasDummyCollege: boolean;
   } | null>(null);
-  const [isEditing, setIsEditing]         = useState(false);
-  const [badges, setBadges]               = useState<UserBadgeInfo[]>([]);
-  const [userStats, setUserStats]         = useState<{ totalSolved: number; correctCount: number } | null>(null);
+
+  const [isEditing, setIsEditing]               = useState(false);
+  const [badges, setBadges]                     = useState<UserBadgeInfo[]>([]);
+  const [userStats, setUserStats]               = useState<{ totalSolved: number; correctCount: number } | null>(null);
   const [activeMasteredTopicModal, setActiveMasteredTopicModal] = useState<UserBadgeInfo | null>(null);
 
+  /* Registration key preview verification state */
+  const [verifiedKeyData, setVerifiedKeyData]   = useState<{
+    valid: boolean;
+    college: { id: number; name: string };
+    department: { id: number; name: string };
+  } | null>(null);
+  const [isVerifyingKey, setIsVerifyingKey]     = useState(false);
+
   /* User-friendly UX filters and tabs */
-  const [topicSearch, setTopicSearch]     = useState('');
-  const [topicFilter, setTopicFilter]     = useState<'all' | 'unlocked' | 'in_progress'>('all');
-  const [copiedField, setCopiedField]     = useState<string | null>(null);
-  const [activeTab, setActiveTab]         = useState<'all' | 'profile' | 'badges'>('all');
+  const [topicSearch, setTopicSearch]           = useState('');
+  const [topicFilter, setTopicFilter]           = useState<'all' | 'unlocked' | 'in_progress'>('all');
+  const [copiedField, setCopiedField]           = useState<string | null>(null);
+  const [activeTab, setActiveTab]               = useState<'all' | 'profile' | 'badges'>('all');
 
   /* Inline field errors */
-  const [errors, setErrors]               = useState<Partial<Record<'fullName' | 'nickname' | 'email' | 'collegeName' | 'password', string>>>({});
+  const [errors, setErrors]                     = useState<Partial<Record<'fullName' | 'nickname' | 'email' | 'registrationKey' | 'password', string>>>({});
 
   /* ── Load on mount ── */
   useEffect(() => {
@@ -132,11 +141,10 @@ export default function ProfileForm() {
           setIsNicknameSame(Boolean(p.isNicknameSame));
           setEmail(p.email || '');
           setEmailType(p.emailType === 'personal' ? 'personal' : 'college');
-          setCollegeName(p.college?.name || 'Enter-your-college');
           setSavedProfile(p);
 
           // If student is beyond grace period and needs updates, open edit mode automatically
-          if (data.gracePeriod?.requiresCollegeUpdate || data.gracePeriod?.requiresPassword) {
+          if (data.gracePeriod?.requiresRegistrationKeySetup || data.gracePeriod?.requiresCollegeUpdate || data.gracePeriod?.requiresPassword) {
             setIsEditing(true);
           } else {
             setIsEditing(false);
@@ -154,6 +162,36 @@ export default function ProfileForm() {
     }
   };
 
+  /* ── Verify Registration Key ── */
+  const handleVerifyKey = async (keyToVerify?: string) => {
+    const k = (keyToVerify !== undefined ? keyToVerify : registrationKey).trim();
+    if (!k) {
+      setErrors(prev => ({ ...prev, registrationKey: 'Please enter a registration key to verify.' }));
+      return;
+    }
+    setIsVerifyingKey(true);
+    try {
+      const res = await fetch('/api/registration-key/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registrationKey: k }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setVerifiedKeyData(data);
+        setErrors(prev => ({ ...prev, registrationKey: undefined }));
+        toast.success(`Verified: ${data.college.name} - ${data.department.name}`);
+      } else {
+        setVerifiedKeyData(null);
+        setErrors(prev => ({ ...prev, registrationKey: data.message || 'Invalid registration key.' }));
+        toast.error(data.message || 'Invalid registration key.');
+      }
+    } catch {
+      toast.error('Failed to verify registration key.');
+    } finally {
+      setIsVerifyingKey(false);
+    }
+  };
 
   /* ── Validation ── */
   const validate = (): boolean => {
@@ -161,15 +199,15 @@ export default function ProfileForm() {
     const name = fullName.trim();
     const nick = isNicknameSame ? name : nickname.trim();
     const mail = email.trim().toLowerCase();
-    const col  = collegeName.trim();
+    const regKey = registrationKey.trim();
 
     if (!name || name.length < 2)                         errs.fullName = 'Full name must be at least 2 characters.';
     if (!nick || nick.length < 2)                         errs.nickname = 'Nickname must be at least 2 characters.';
     if (!mail || !mail.includes('@') || !mail.includes('.')) errs.email = 'Enter a valid email address.';
 
     if (gracePeriodInfo?.isBeyondGracePeriod) {
-      if (!col || col.toLowerCase() === 'enter-your-college') {
-        errs.collegeName = 'Your college/school name is required after the 5-day grace period.';
+      if (!savedProfile?.collegeDepartmentId && !regKey) {
+        errs.registrationKey = 'A valid registration key is required after the 5-day grace period.';
       }
       if (!savedProfile?.hasPassword && !password) {
         errs.password = 'A password is required after the 5-day grace period.';
@@ -215,7 +253,8 @@ export default function ProfileForm() {
       setIsNicknameSame(savedProfile.isNicknameSame);
       setEmail(savedProfile.email);
       setEmailType(savedProfile.emailType as 'college' | 'personal');
-      setCollegeName(savedProfile.college?.name || 'Enter-your-college');
+      setRegistrationKey('');
+      setVerifiedKeyData(null);
       setPassword('');
       setErrors({});
     }
@@ -258,7 +297,7 @@ export default function ProfileForm() {
     const cleanFullName = fullName.trim();
     const cleanNickname = (isNicknameSame ? cleanFullName : nickname).trim();
     const cleanEmail    = email.trim().toLowerCase();
-    const cleanCollege  = collegeName.trim();
+    const cleanRegKey   = registrationKey.trim();
 
     setLoading(true);
     try {
@@ -268,7 +307,7 @@ export default function ProfileForm() {
         isNicknameSame,
         email: cleanEmail,
         emailType,
-        collegeName: cleanCollege,
+        registrationKey: cleanRegKey || undefined,
         password: password.trim() || undefined,
       };
 
@@ -280,10 +319,10 @@ export default function ProfileForm() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        if (data.error === 'COLLEGE_NOT_FOUND' || data.error === 'COLLEGE_REQUIRED') {
+        if (data.error === 'INVALID_REGISTRATION_KEY' || data.error === 'REGISTRATION_KEY_REQUIRED') {
           setErrors(prev => ({
             ...prev,
-            collegeName: 'Please enter the exact college/school name provided by your college administrator. The name must match exactly.',
+            registrationKey: data.message || 'Invalid registration key.',
           }));
         }
         if (data.error === 'INVALID_PASSWORD' || data.error === 'PASSWORD_REQUIRED') {
@@ -298,6 +337,8 @@ export default function ProfileForm() {
 
       localStorage.setItem('cyber_quiz_username', cleanNickname);
       setSavedProfile(data.profile);
+      setRegistrationKey('');
+      setVerifiedKeyData(null);
       setPassword('');
       setIsEditing(false);
       toast.success('Profile saved successfully!');
@@ -357,32 +398,32 @@ export default function ProfileForm() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="page-title text-2xl">Participant Profile</h1>
-            <p className="page-subtitle">Manage your identity, verified institution, and track achievements.</p>
+            <p className="page-subtitle">Manage your student identity, department association, and track achievements.</p>
           </div>
         </div>
       </div>
 
       {/* ── Grace Period Warning Banners ── */}
-      {gracePeriodInfo?.requiresCollegeUpdate && (
+      {(gracePeriodInfo?.requiresRegistrationKeySetup || gracePeriodInfo?.requiresCollegeUpdate) && (
         <div className="flex items-start gap-3 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 shadow-xs">
           <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="text-xs sm:text-sm font-bold text-rose-900 dark:text-rose-200">
-              College/School Information Required
+              Registration Key &amp; Department Setup Required
             </p>
             <p className="text-xs text-rose-700 dark:text-rose-300 leading-relaxed">
-              Your 5-day grace period has ended. Please enter the exact name provided by your college administrator to continue attempting daily quizzes.
+              Your 5-day grace period has ended. Please enter the registration key provided by your college/department administrator to continue attempting daily quizzes.
             </p>
           </div>
         </div>
       )}
 
-      {!gracePeriodInfo?.isBeyondGracePeriod && gracePeriodInfo?.hasDummyCollege && (
+      {!gracePeriodInfo?.isBeyondGracePeriod && !savedProfile?.collegeDepartmentId && (
         <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 text-xs">
           <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <p className="text-amber-900 dark:text-amber-200 leading-relaxed">
             <strong className="font-semibold">Grace Period Active:</strong> You have{' '}
-            <strong>{gracePeriodInfo.daysRemaining} day{gracePeriodInfo.daysRemaining === 1 ? '' : 's'} remaining</strong> to enter your official college name.
+            <strong>{gracePeriodInfo?.daysRemaining || 5} day{(gracePeriodInfo?.daysRemaining || 5) === 1 ? '' : 's'} remaining</strong> to enter your department registration key.
           </p>
         </div>
       )}
@@ -507,20 +548,22 @@ export default function ProfileForm() {
               value={savedProfile.emailType === 'college' ? 'College / Institutional' : 'Personal'}
               icon={Building2}
             />
-            <div className="sm:col-span-2">
-              <ProfileField
-                label="College / School Name"
-                value={savedProfile.college?.name || 'Enter-your-college'}
-                icon={Building2}
-                note={
-                  savedProfile.college?.name === 'Enter-your-college'
-                    ? 'Placeholder college (Update to your official institution)'
-                    : `Verified Identifier: ${savedProfile.college?.identifier || 'Active'}`
-                }
-                onCopy={() => handleCopy(savedProfile.college?.name || '', 'College Name')}
-                isCopied={copiedField === 'College Name'}
-              />
-            </div>
+            <ProfileField
+              label="College / Institution"
+              value={savedProfile.collegeName || savedProfile.college?.name || 'Unassigned'}
+              icon={Building2}
+              note={savedProfile.collegeDepartmentId ? 'Verified Institution' : 'Grace Period (Unassigned)'}
+              onCopy={() => handleCopy(savedProfile.collegeName || savedProfile.college?.name || '', 'College Name')}
+              isCopied={copiedField === 'College Name'}
+            />
+            <ProfileField
+              label="Department"
+              value={savedProfile.departmentName || savedProfile.collegeDepartment?.departmentName || 'Unassigned'}
+              icon={Building2}
+              note={savedProfile.collegeDepartmentId ? 'Permanent Association' : 'Pending Registration Key'}
+              onCopy={() => handleCopy(savedProfile.departmentName || savedProfile.collegeDepartment?.departmentName || '', 'Department')}
+              isCopied={copiedField === 'Department'}
+            />
           </div>
 
           {/* Synced notice */}
@@ -566,7 +609,7 @@ export default function ProfileForm() {
                   {savedProfile ? 'Edit Profile' : 'Create Profile'}
                 </h2>
               </div>
-              {savedProfile && !gracePeriodInfo?.requiresCollegeUpdate && (
+              {savedProfile && !gracePeriodInfo?.requiresRegistrationKeySetup && (
                 <button type="button" onClick={handleCancel} className="btn-icon">
                   <X className="w-4 h-4" />
                 </button>
@@ -576,9 +619,9 @@ export default function ProfileForm() {
             <div className="p-6 space-y-6">
 
               {/* Grace Period Notice inside Form */}
-              {gracePeriodInfo?.requiresCollegeUpdate && (
+              {(gracePeriodInfo?.requiresRegistrationKeySetup || gracePeriodInfo?.requiresCollegeUpdate) && (
                 <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-800 dark:text-rose-200">
-                  <strong className="font-bold">Required Update:</strong> Please enter the exact name provided by your college administrator to continue.
+                  <strong className="font-bold">Required Action:</strong> Please enter the registration key provided by your department administrator to continue.
                 </div>
               )}
 
@@ -664,38 +707,86 @@ export default function ProfileForm() {
 
               <div className="section-divider" />
 
-              {/* ── Section 2: College / School Association ── */}
+              {/* ── Section 2: Registration Key (College + Department) ── */}
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <Building2 className="w-3.5 h-3.5" /> Institution Details
+                  <KeyRound className="w-3.5 h-3.5 text-blue-500" /> College &amp; Department Registration Key
                 </h3>
 
-                <div>
-                  <label htmlFor="collegeName" className="field-label">
-                    College / School Name <span className="text-rose-500" aria-hidden="true">*</span>
-                  </label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    <input
-                      id="collegeName"
-                      type="text"
-                      value={collegeName}
-                      onChange={e => { setCollegeName(e.target.value); if (errors.collegeName) setErrors(er => ({ ...er, collegeName: undefined })); }}
-                      placeholder="e.g. MIT - WPU University Pune"
-                      maxLength={150}
-                      aria-invalid={!!errors.collegeName}
-                      aria-describedby={errors.collegeName ? 'college-err' : 'college-hint'}
-                      className={`field-input pl-9 ${errors.collegeName ? 'field-input-error' : ''}`}
-                    />
+                {savedProfile?.collegeDepartment && !registrationKey && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 text-xs">
+                    <p className="text-slate-500 dark:text-slate-400">Currently enrolled under:</p>
+                    <p className="font-bold text-slate-900 dark:text-white mt-0.5">
+                      {savedProfile.collegeName || savedProfile.college?.name} — {savedProfile.departmentName || savedProfile.collegeDepartment?.departmentName}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      To change your department, enter a new registration key below.
+                    </p>
                   </div>
-                  {errors.collegeName ? (
-                    <p id="college-err" role="alert" className="field-error">
-                      {errors.collegeName}
+                )}
+
+                <div>
+                  <label htmlFor="registrationKey" className="field-label">
+                    Registration Key
+                    {gracePeriodInfo?.isBeyondGracePeriod && !savedProfile?.collegeDepartmentId && (
+                      <span className="text-rose-500 ml-0.5">*</span>
+                    )}
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                      <input
+                        id="registrationKey"
+                        type="text"
+                        value={registrationKey}
+                        onChange={e => {
+                          setRegistrationKey(e.target.value);
+                          setVerifiedKeyData(null);
+                          if (errors.registrationKey) setErrors(er => ({ ...er, registrationKey: undefined }));
+                        }}
+                        onBlur={() => {
+                          if (registrationKey.trim()) handleVerifyKey();
+                        }}
+                        placeholder="e.g. MITCSE2026 or CSE-MIT"
+                        maxLength={100}
+                        aria-invalid={!!errors.registrationKey}
+                        aria-describedby={errors.registrationKey ? 'regkey-err' : 'regkey-hint'}
+                        className={`field-input pl-9 ${errors.registrationKey ? 'field-input-error' : ''}`}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleVerifyKey()}
+                      disabled={isVerifyingKey || !registrationKey.trim()}
+                      className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer shrink-0 flex items-center gap-1.5"
+                    >
+                      {isVerifyingKey ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'Verify'}
+                    </button>
+                  </div>
+
+                  {errors.registrationKey ? (
+                    <p id="regkey-err" role="alert" className="field-error">
+                      {errors.registrationKey}
                     </p>
                   ) : (
-                    <p id="college-hint" className="field-helper">
-                      Enter the exact name provided by your college administrator. The name must match exactly.
+                    <p id="regkey-hint" className="field-helper">
+                      Enter the registration key provided by your college or department administrator.
                     </p>
+                  )}
+
+                  {/* Verified Preview Card */}
+                  {verifiedKeyData && (
+                    <div className="mt-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-900 dark:text-emerald-100 space-y-1.5 animate-in fade-in duration-200">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-800 dark:text-emerald-300">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Registration key verified.</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400">You will be registered under:</p>
+                      <div className="pt-0.5 space-y-0.5 text-slate-800 dark:text-slate-200 text-xs">
+                        <p><span className="text-slate-500 dark:text-slate-400 font-medium">College:</span> <strong className="font-bold">{verifiedKeyData.college.name}</strong></p>
+                        <p><span className="text-slate-500 dark:text-slate-400 font-medium">Department:</span> <strong className="font-bold">{verifiedKeyData.department.name}</strong></p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -813,7 +904,7 @@ export default function ProfileForm() {
 
             {/* ── Form actions ── */}
             <div className="flex items-center gap-2 px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
-              {savedProfile && !gracePeriodInfo?.requiresCollegeUpdate && (
+              {savedProfile && !gracePeriodInfo?.requiresRegistrationKeySetup && (
                 <button
                   type="button"
                   onClick={handleCancel}
@@ -847,7 +938,7 @@ export default function ProfileForm() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
             <div className="flex items-center space-x-2">
               <Award className="w-5 h-5 text-amber-500" />
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Achievements & Badges</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Achievements &amp; Badges</h2>
             </div>
             <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-500">
               <span>
@@ -1166,4 +1257,3 @@ export default function ProfileForm() {
     </div>
   );
 }
-

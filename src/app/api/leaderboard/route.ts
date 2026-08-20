@@ -18,21 +18,25 @@ export async function GET(req: NextRequest) {
   const todayStr = `${year}-${month}-${day}`;
 
   try {
-    // Check if authenticated admin
     const { isAuth, admin } = await verifyAdminRequest(req);
-    const collegeId = isAuth && admin && !admin.isSuperAdmin ? admin.collegeId : null;
+    const scope = isAuth && admin && !admin.isSuperAdmin
+      ? {
+          collegeDepartmentId: admin.collegeDepartmentId || null,
+          collegeId: admin.collegeId || null,
+        }
+      : {};
 
-    const leaderboard = await dataService.getLeaderboardByCollege(collegeId, period);
+    const leaderboard = await dataService.getLeaderboardByScope(scope, period);
 
     return NextResponse.json({
       success: true,
       period,
       quizDate: todayStr,
-      collegeId,
+      collegeId: scope.collegeId || null,
+      collegeDepartmentId: scope.collegeDepartmentId || null,
       leaderboard,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
-

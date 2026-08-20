@@ -44,17 +44,25 @@ export async function GET(req: NextRequest) {
   const cleanName = userName.trim();
 
   try {
-    // If request contains admin token, enforce admin college boundary
+    // If request contains admin token, enforce admin scope boundary (department or college)
     const tokenHeader = req.headers.get('x-admin-token') || req.headers.get('authorization');
     if (tokenHeader) {
       const { isAuth, admin } = await verifyAdminRequest(req);
-      if (isAuth && admin && !admin.isSuperAdmin && admin.collegeId) {
+      if (isAuth && admin && !admin.isSuperAdmin) {
         const student = await dataService.getUserProfile(cleanName);
-        if (student && student.collegeId !== admin.collegeId) {
-          return NextResponse.json(
-            { success: false, message: 'Forbidden: You cannot access student reports from other institutions.' },
-            { status: 403 }
-          );
+        if (student) {
+          if (admin.collegeDepartmentId && student.collegeDepartmentId !== admin.collegeDepartmentId) {
+            return NextResponse.json(
+              { success: false, message: 'Forbidden: You cannot access student reports from other departments.' },
+              { status: 403 }
+            );
+          }
+          if (admin.collegeId && student.collegeId !== admin.collegeId && student.collegeDepartment?.collegeId !== admin.collegeId) {
+            return NextResponse.json(
+              { success: false, message: 'Forbidden: You cannot access student reports from other institutions.' },
+              { status: 403 }
+            );
+          }
         }
       }
     }

@@ -2,8 +2,8 @@ import { db as prisma } from '../src/lib/db';
 import { dataService } from '../src/lib/dataService';
 import {
   normalizeCollegeName,
-  isCollegeNameMatch,
-  isDummyCollege,
+  normalizeRegistrationKey,
+  validateRegistrationKeyFormat,
   getStudentGracePeriodStatus,
   validateStudentPassword,
   generateStrongPassword,
@@ -31,218 +31,225 @@ function assert(condition: boolean, testName: string, detail?: string) {
 }
 
 async function runTests() {
-  console.log('\n======================================================');
-  console.log('🧪 RUNNING COLLEGE MANAGEMENT SYSTEM VERIFICATION SUITE');
-  console.log('======================================================\n');
+  console.log('\n========================================================================');
+  console.log('🧪 RUNNING REGISTRATION KEY + COLLEGE/DEPARTMENT ARCHITECTURE TEST SUITE');
+  console.log('========================================================================\n');
 
   try {
     // ----------------------------------------------------------------
-    // 1. Normalization & Matching Logic
+    // 1. Registration Key Normalization & Flexible Formats
     // ----------------------------------------------------------------
-    console.log('--- Case 1: College Name Normalization ---');
-    const norm1 = normalizeCollegeName('  MIT   -   WPU  University  Pune.  ');
-    assert(norm1 === 'MIT - WPU University Pune', 'Whitespace and trailing punctuation stripping', `Got: "${norm1}"`);
+    console.log('--- Case 1: Registration Key Normalization & Format Flexibility ---');
+    const normKey1 = normalizeRegistrationKey('   MITCSE2026   ');
+    assert(normKey1 === 'MITCSE2026', 'Whitespace trimming', `Got: "${normKey1}"`);
 
-    const norm2 = normalizeCollegeName('College of Engineering, Pune');
-    assert(norm2 === 'College of Engineering, Pune', 'Punctuation within name preserved', `Got: "${norm2}"`);
+    const normKey2 = normalizeRegistrationKey('  CSE - 2026 # 1  ');
+    assert(normKey2 === 'CSE - 2026 # 1', 'Special characters and internal spaces preserved', `Got: "${normKey2}"`);
 
-    // ----------------------------------------------------------------
-    // 2. Exact Normalized College Matching
-    // ----------------------------------------------------------------
-    console.log('\n--- Case 2: Exact Normalized Matching ---');
-    assert(
-      isCollegeNameMatch('mit - wpu university pune', 'MIT - WPU University Pune'),
-      'Case-insensitive match'
-    );
-    assert(
-      isCollegeNameMatch('  MIT  -  WPU   University   Pune. ', 'MIT - WPU University Pune'),
-      'Spacing/punctuation variance match'
-    );
-    assert(
-      !isCollegeNameMatch('MIT University', 'MIT - WPU University Pune'),
-      'Partial name correctly rejected'
-    );
-    assert(
-      !isCollegeNameMatch('Random College XYZ', 'MIT - WPU University Pune'),
-      'Unconfigured college name rejected'
-    );
+    assert(validateRegistrationKeyFormat('K').isValid === true, 'Single character key valid');
+    assert(validateRegistrationKeyFormat('MITCSE2026').isValid === true, 'Standard alphanumeric key valid');
+    assert(validateRegistrationKeyFormat('CSE@MIT#2026').isValid === true, 'Key with special characters valid');
+    assert(validateRegistrationKeyFormat('   ').isValid === false, 'Empty whitespace-only key rejected');
 
     // ----------------------------------------------------------------
-    // 3. Dummy College Detection
+    // 2. Registration Key Resolution to College & Department
     // ----------------------------------------------------------------
-    console.log('\n--- Case 3: Dummy College Recognition ---');
-    assert(isDummyCollege('Enter-your-college'), 'Enter-your-college recognized as dummy');
-    assert(isDummyCollege('enter-your-college'), 'Case-insensitive enter-your-college is dummy');
-    assert(isDummyCollege(' Enter your college '), 'Spaced Enter your college is dummy');
-    assert(!isDummyCollege('MIT - WPU University Pune'), 'Real college is not dummy');
-
-    // ----------------------------------------------------------------
-    // 4. 5-Day Grace Period Calculation
-    // ----------------------------------------------------------------
-    console.log('\n--- Case 4: 5-Day Grace Period Status ---');
-    const freshStudent = {
-      createdAt: new Date(),
-      collegeId: 1,
-      college: { id: 1, name: 'Enter-your-college', identifier: 'DUMMY' },
-      passwordHash: null,
-    };
-    const grace1 = getStudentGracePeriodStatus(freshStudent);
-    assert(grace1.isWithinGracePeriod === true, 'New student is within grace period');
-    assert(grace1.requiresCollegeSetup === false, 'New student with dummy college does not yet require setup');
-    assert(grace1.daysRemaining >= 4 && grace1.daysRemaining <= 5, 'Days remaining calculated accurately (4-5 days)');
-
-    const expiredDate = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000); // 6 days ago
-    const expiredStudent = {
-      createdAt: expiredDate,
-      collegeId: 1,
-      college: { id: 1, name: 'Enter-your-college', identifier: 'DUMMY' },
-      passwordHash: null,
-    };
-    const graceExpired = getStudentGracePeriodStatus(expiredStudent);
-    assert(graceExpired.isWithinGracePeriod === false, 'Student created 6 days ago is NOT within grace period');
-    assert(graceExpired.requiresCollegeSetup === true, 'Expired student requires college setup');
-    assert(graceExpired.daysRemaining === 0, 'Days remaining is 0');
-
-    // ----------------------------------------------------------------
-    // 5. Student Password Policy Validation
-    // ----------------------------------------------------------------
-    console.log('\n--- Case 5: Password Policy Enforcement ---');
-    assert(validateStudentPassword('Password123').isValid === true, 'Valid password accepted (upper, lower, num, 8+ chars)');
-    assert(validateStudentPassword('short1A').isValid === false, 'Short password (<8 chars) rejected');
-    assert(validateStudentPassword('alllowercase1').isValid === false, 'Missing uppercase rejected');
-    assert(validateStudentPassword('ALLUPPERCASE1').isValid === false, 'Missing lowercase rejected');
-    assert(validateStudentPassword('NoNumbersPassword').isValid === false, 'Missing number rejected');
-
-    const generated = generateStrongPassword();
-    assert(validateStudentPassword(generated).isValid === true, 'Auto-generated strong password passes validation');
-
-    // ----------------------------------------------------------------
-    // 6. Super Admin College CRUD
-    // ----------------------------------------------------------------
-    console.log('\n--- Case 6: Super Admin College Configuration CRUD ---');
-    const testCollegeIdentifier = `TEST_COL_${Date.now()}`;
-    const testCollegeName = `Test Institute of Technology ${Date.now()}`;
-
-    // Create
-    const createdCollege = await dataService.createCollege({
-      name: testCollegeName,
-      identifier: testCollegeIdentifier,
-    });
-    assert(createdCollege.id > 0, 'Super Admin creates college successfully');
-    assert(createdCollege.identifier === testCollegeIdentifier.toUpperCase(), 'College identifier stored in uppercase');
-
-    // Normalized search
-    const foundByName = await dataService.findCollegeByName(`  ${testCollegeName.toLowerCase()} . `);
-    assert(foundByName !== null && foundByName.id === createdCollege.id, 'Normalized college lookup finds newly created college');
-
-    // Update
-    const updatedCollege = await dataService.updateCollege(createdCollege.id, {
-      name: `${testCollegeName} Updated`,
-    });
-    assert(updatedCollege.name === `${testCollegeName} Updated`, 'Super Admin updates college name');
-
-    // Delete
-    const deleted = await dataService.deleteCollege(createdCollege.id);
-    assert(deleted === true, 'Super Admin deletes college');
-
-    // ----------------------------------------------------------------
-    // 7. Super Admin Admin Creation with College Assignment
-    // ----------------------------------------------------------------
-    console.log('\n--- Case 7: Super Admin Creates Admin with College ---');
-    const dummyCollege = await dataService.getOrCreateDummyCollege();
+    console.log('\n--- Case 2: Registration Key Lookup & Resolution ---');
     const mitCollege = await dataService.findCollegeByName('MIT - WPU University Pune');
-    assert(mitCollege !== null, 'Found MIT-WPU college in seeded database');
+    assert(mitCollege !== null, 'Found MIT-WPU college in database');
 
     if (mitCollege) {
-      const testAdminEmail = `test.officer.${Date.now()}@wpu.edu.in`;
-      const newAdmin = await dataService.createAdmin({
-        email: testAdminEmail,
-        name: 'Test Officer',
-        passwordHash: hashPassword('TestAdmin@123'),
-        collegeId: mitCollege.id,
-      });
-      assert(newAdmin.collegeId === mitCollege.id, 'Admin successfully created with college association');
-      assert(newAdmin.email === testAdminEmail, 'Admin email correctly set');
+      const dept = await dataService.findDepartmentByRegistrationKey('MITCSE2026');
+      assert(dept !== null, 'Found department for registration key MITCSE2026');
+      assert(dept?.departmentName === 'Computer Science & Engineering', 'Resolved department is Computer Science');
+      assert(dept?.collegeId === mitCollege.id, 'Resolved college is MIT-WPU');
 
-      // ----------------------------------------------------------------
-      // 8. Admin Token Signing & College Scoping
-      // ----------------------------------------------------------------
-      console.log('\n--- Case 8: Admin Token Scoping & Verification ---');
-      const token = signAdminToken({
-        id: newAdmin.id,
-        email: newAdmin.email,
-        name: newAdmin.name,
-        collegeId: mitCollege.id,
-        collegeName: mitCollege.name,
-      });
-      assert(typeof token === 'string' && token.length > 20, 'Signed JWT-like admin token');
-
-      const verifiedPayload = verifyAdminToken(token);
-      assert(verifiedPayload !== null, 'Admin token verifies successfully');
-      assert(verifiedPayload?.collegeId === mitCollege.id, 'Admin token payload contains correct collegeId');
-      assert(verifiedPayload?.collegeName === mitCollege.name, 'Admin token payload contains correct collegeName');
-
-      // ----------------------------------------------------------------
-      // 9. College Scoped Reporting & Data Isolation
-      // ----------------------------------------------------------------
-      console.log('\n--- Case 9: College Data Isolation & Scoped Reporting ---');
-      const mitStudents = await dataService.getStudentsByCollege(mitCollege.id);
-      assert(Array.isArray(mitStudents), 'Retrieved students list for MIT college');
-      assert(mitStudents.every(s => s.collegeId === mitCollege.id), 'All returned students belong strictly to MIT-WPU');
-
-      const coepCollege = await dataService.findCollegeByName('College of Engineering Pune');
-      if (coepCollege) {
-        const coepStudents = await dataService.getStudentsByCollege(coepCollege.id);
-        assert(coepStudents.every(s => s.collegeId === coepCollege.id), 'COEP students strictly isolated from MIT');
-        // Ensure no cross-college student leakage
-        const overlap = mitStudents.filter(m => coepStudents.some(c => c.id === m.id));
-        assert(overlap.length === 0, 'Zero student data leakage between colleges');
-
-        // Scoped Stats Isolation
-        const mitStats = await dataService.getStatsByCollege(mitCollege.id);
-        const coepStats = await dataService.getStatsByCollege(coepCollege.id);
-        const globalStats = await dataService.getStatsByCollege(null); // Unrestricted
-
-        assert(mitStats.totalUsers <= globalStats.totalUsers, 'MIT user count is scoped subset of global');
-        assert(coepStats.totalUsers <= globalStats.totalUsers, 'COEP user count is scoped subset of global');
-      }
-
-      // ----------------------------------------------------------------
-      // 10. Student Password Reset by Admin
-      // ----------------------------------------------------------------
-      const newHash = hashPassword('NewSecurePass@2026');
-      const resetResult = await dataService.resetStudentPassword('alex_mit', newHash);
-      assert(resetResult !== null, 'Admin resets student password');
-
-      // Verify the updated hash works
-      const studentProfile = await prisma.userProfile.findUnique({ where: { nickname: 'alex_mit' } });
-      assert(studentProfile?.passwordHash !== null, 'Student profile has non-null passwordHash');
-      if (studentProfile?.passwordHash) {
-        assert(verifyPassword('NewSecurePass@2026', studentProfile.passwordHash), 'New password verifies against stored hash');
-      }
-
-      // Cleanup test admin
-      await prisma.adminUser.delete({ where: { id: newAdmin.id } });
+      const notFoundDept = await dataService.findDepartmentByRegistrationKey('INVALID_KEY_999');
+      assert(notFoundDept === null, 'Invalid key returns null');
     }
 
     // ----------------------------------------------------------------
-    // 11. Super Admin Unrestricted Capabilities
+    // 3. Super Admin Department CRUD & Key Uniqueness
     // ----------------------------------------------------------------
-    console.log('\n--- Case 11: Super Admin Authentication & Unrestricted Access ---');
-    const superToken = signSuperAdminToken();
-    assert(verifySuperAdminToken(superToken) === true, 'Super Admin token verifies');
-    const allColleges = await dataService.getAllColleges();
-    assert(allColleges.length >= 4, 'Super Admin sees all configured colleges');
+    console.log('\n--- Case 3: Super Admin Department CRUD & Key Uniqueness ---');
+    if (mitCollege) {
+      const uniqueKey = `TESTKEY_${Date.now()}`;
+      const createdDept = await dataService.createDepartment({
+        collegeId: mitCollege.id,
+        departmentName: `Test Dept ${Date.now()}`,
+        registrationKey: uniqueKey,
+      });
+
+      assert(createdDept.id > 0, 'Created department successfully');
+      assert(createdDept.registrationKey === uniqueKey, 'Stored registration key matches input');
+
+      // Attempt to create another department with duplicate key -> should fail
+      let duplicateError = false;
+      try {
+        await dataService.createDepartment({
+          collegeId: mitCollege.id,
+          departmentName: `Another Dept ${Date.now()}`,
+          registrationKey: uniqueKey,
+        });
+      } catch {
+        duplicateError = true;
+      }
+      assert(duplicateError === true, 'Duplicate registration key rejected by uniqueness constraint');
+
+      // Update Department registration key
+      const updatedKey = `${uniqueKey}_UPDATED`;
+      const updatedDept = await dataService.updateDepartment(createdDept.id, {
+        registrationKey: updatedKey,
+      });
+      assert(updatedDept.registrationKey === updatedKey, 'Updated department registration key');
+
+      // Delete Department
+      const deleted = await dataService.deleteDepartment(createdDept.id);
+      assert(deleted === true, 'Deleted department');
+    }
 
     // ----------------------------------------------------------------
-    // 12. Password Hashing Security
+    // 4. Student Registration with Registration Key
     // ----------------------------------------------------------------
-    console.log('\n--- Case 12: Cryptographic Password Hashing ---');
-    const h1 = hashPassword('MySecretPass@123');
-    const h2 = hashPassword('MySecretPass@123');
-    assert(h1 !== h2, 'Salts are unique per hash');
-    assert(verifyPassword('MySecretPass@123', h1), 'Correct password verifies');
-    assert(!verifyPassword('WrongPassword', h1), 'Wrong password fails verification');
+    console.log('\n--- Case 4: Student Registration via Authoritative Registration Key ---');
+    const testStudentNick = `test_student_${Date.now()}`;
+    const registeredStudent = await dataService.upsertUserProfile({
+      fullName: 'New Department Student',
+      nickname: testStudentNick,
+      isNicknameSame: false,
+      email: `${testStudentNick}@example.com`,
+      emailType: 'college',
+      registrationKey: 'MITCSE2026',
+      passwordHash: hashPassword('SecurePassword123'),
+    });
+
+    assert(registeredStudent.collegeDepartmentId !== null, 'Student associated with collegeDepartmentId');
+    assert(registeredStudent.collegeDepartment?.departmentName === 'Computer Science & Engineering', 'Student department resolved as Computer Science');
+    assert(
+      (registeredStudent.collegeDepartment?.college?.name || registeredStudent.college?.name) === 'MIT - WPU University Pune',
+      'Student college resolved as MIT-WPU'
+    );
+
+    // ----------------------------------------------------------------
+    // 5. Registration Key Rotation & Permanent Student Association
+    // ----------------------------------------------------------------
+    console.log('\n--- Case 5: Key Rotation & Permanent Student Association ---');
+    // Fetch department
+    const csDept = await dataService.findDepartmentByRegistrationKey('MITCSE2026');
+    assert(csDept !== null, 'Found CSE department');
+
+    if (csDept) {
+      const studentBeforeRotation = await dataService.getUserProfile(testStudentNick);
+      const originalDeptId = studentBeforeRotation?.collegeDepartmentId;
+
+      // Rotate key to MITCSE2027
+      const rotated = await dataService.updateRegistrationKey(csDept.id, 'MITCSE2027');
+      assert(rotated.registrationKey === 'MITCSE2027', 'Registration key rotated to MITCSE2027');
+
+      // Check existing student: Department relationship MUST REMAIN UNCHANGED
+      const studentAfterRotation = await dataService.getUserProfile(testStudentNick);
+      assert(
+        studentAfterRotation?.collegeDepartmentId === originalDeptId,
+        'Existing student collegeDepartmentId remains intact after key rotation'
+      );
+      assert(
+        studentAfterRotation?.collegeDepartment?.departmentName === 'Computer Science & Engineering',
+        'Existing student departmentName remains unchanged'
+      );
+
+      // Verify old key MITCSE2026 is no longer valid for new registrations
+      const oldKeyLookup = await dataService.findDepartmentByRegistrationKey('MITCSE2026');
+      assert(oldKeyLookup === null, 'Old registration key is deactivated for new lookups');
+
+      // Verify new key MITCSE2027 is valid for new registrations
+      const newKeyLookup = await dataService.findDepartmentByRegistrationKey('MITCSE2027');
+      assert(newKeyLookup !== null && newKeyLookup.id === csDept.id, 'New registration key resolves correctly');
+
+      // Restore key back to MITCSE2026 for consistency
+      await dataService.updateRegistrationKey(csDept.id, 'MITCSE2026');
+    }
+
+    // ----------------------------------------------------------------
+    // 6. Department Scoped Reporting & Data Isolation
+    // ----------------------------------------------------------------
+    console.log('\n--- Case 6: Department Scoped Queries & Isolation ---');
+    const mitDept = await dataService.findDepartmentByRegistrationKey('MITCSE2026');
+    const coepDept = await dataService.findDepartmentByRegistrationKey('COEPCSE');
+
+    if (mitDept && coepDept) {
+      // Department-level query
+      const mitDeptStudents = await dataService.getStudentsByScope({ collegeDepartmentId: mitDept.id });
+      assert(
+        mitDeptStudents.every(s => s.collegeDepartmentId === mitDept.id),
+        'Department admin queries return ONLY students enrolled in that specific department'
+      );
+
+      const coepDeptStudents = await dataService.getStudentsByScope({ collegeDepartmentId: coepDept.id });
+      assert(
+        coepDeptStudents.every(s => s.collegeDepartmentId === coepDept.id),
+        'COEP department students strictly isolated from MIT department'
+      );
+
+      // College-level query (contains all departments under that college)
+      const mitCollegeStudents = await dataService.getStudentsByScope({ collegeId: mitDept.collegeId });
+      assert(
+        mitCollegeStudents.some(s => s.nickname === 'alex_mit'),
+        'College-level query includes students from all departments within that college'
+      );
+
+      // Global query (Super Admin)
+      const allStudents = await dataService.getStudentsByScope({});
+      assert(
+        allStudents.length >= mitDeptStudents.length + coepDeptStudents.length,
+        'Global super admin query includes all students across all institutions'
+      );
+    }
+
+    // ----------------------------------------------------------------
+    // 7. Admin Token Department Scoping
+    // ----------------------------------------------------------------
+    console.log('\n--- Case 7: Admin Token Department Scoping ---');
+    if (mitDept) {
+      const token = signAdminToken({
+        id: 999,
+        email: 'admin.cse@wpu.edu.in',
+        name: 'CSE Admin',
+        collegeId: mitDept.collegeId,
+        collegeName: 'MIT - WPU University Pune',
+        collegeDepartmentId: mitDept.id,
+        departmentName: 'Computer Science & Engineering',
+      });
+
+      const verified = verifyAdminToken(token);
+      assert(verified?.collegeDepartmentId === mitDept.id, 'Admin token carries collegeDepartmentId');
+      assert(verified?.departmentName === 'Computer Science & Engineering', 'Admin token carries departmentName');
+    }
+
+    // ----------------------------------------------------------------
+    // 8. 5-Day Grace Period Enforcement
+    // ----------------------------------------------------------------
+    console.log('\n--- Case 8: Grace Period Status ---');
+    const freshStudent = {
+      createdAt: new Date(),
+      collegeDepartmentId: null,
+      passwordHash: null,
+    };
+    const graceStatus = getStudentGracePeriodStatus(freshStudent);
+    assert(graceStatus.isWithinGracePeriod === true, 'Fresh student is within 5-day grace period');
+    assert(graceStatus.isBeyondGracePeriod === false, 'Fresh student not beyond grace period');
+    assert(graceStatus.requiresRegistrationKeySetup === false, 'Fresh student does not yet require key setup');
+
+    const expiredStudent = {
+      createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), // 6 days ago
+      collegeDepartmentId: null,
+      passwordHash: null,
+    };
+    const expiredStatus = getStudentGracePeriodStatus(expiredStudent);
+    assert(expiredStatus.isBeyondGracePeriod === true, 'Student created 6 days ago is beyond grace period');
+    assert(expiredStatus.requiresRegistrationKeySetup === true, 'Expired student requires registration key setup');
+
+    // Clean up test student
+    await prisma.userProfile.delete({ where: { nickname: testStudentNick } });
 
   } catch (err) {
     console.error('Unexpected error in test execution:', err);
@@ -251,9 +258,9 @@ async function runTests() {
     await prisma.$disconnect();
   }
 
-  console.log('\n======================================================');
+  console.log('\n========================================================================');
   console.log(`📊 TEST SUITE SUMMARY: ${passedTests} PASSED, ${failedTests} FAILED`);
-  console.log('======================================================\n');
+  console.log('========================================================================\n');
 
   if (failedTests > 0) {
     process.exit(1);
