@@ -584,6 +584,19 @@ export default function SuperAdminDashboard() {
       return;
     }
 
+    const existingCollege = nonDummyColleges.find(
+      c =>
+        c.name.toLowerCase() === newCollegeName.trim().toLowerCase() ||
+        c.identifier.toLowerCase() === newCollegeIdentifier.trim().toLowerCase()
+    );
+    if (existingCollege) {
+      const existingAdminForCol = admins.find(a => a.collegeId === existingCollege.id);
+      if (existingAdminForCol) {
+        toast.error(`"${existingCollege.name}" already has an assigned admin (${existingAdminForCol.email}). Only one admin is permitted per college.`);
+        return;
+      }
+    }
+
     setIsSavingAdmin(true);
     try {
       const res = await fetch('/api/superadmin/admins', {
@@ -1481,28 +1494,18 @@ export default function SuperAdminDashboard() {
                     <label className="field-label">Official College Name <span className="text-rose-500">*</span></label>
                     <input
                       type="text"
-                      list="existing-colleges-list"
                       value={newCollegeName}
                       onChange={e => {
                         const val = e.target.value;
                         setNewCollegeName(val);
-                        const match = nonDummyColleges.find(c => c.name.toLowerCase() === val.toLowerCase());
-                        if (match) {
-                          setNewCollegeIdentifier(match.identifier);
-                        } else if (!newCollegeIdentifier || newCollegeIdentifier === generateIdentifier(newCollegeName)) {
-                          setNewCollegeIdentifier(generateIdentifier(val));
-                        }
+                        setNewCollegeIdentifier(generateIdentifier(val));
                       }}
                       placeholder="e.g. MIT - WPU University Pune"
                       className="field-input"
                       required
                       autoFocus
+                      autoComplete="off"
                     />
-                    <datalist id="existing-colleges-list">
-                      {nonDummyColleges.map(c => (
-                        <option key={c.id} value={c.name}>{c.identifier}</option>
-                      ))}
-                    </datalist>
                     <p className="field-helper mt-1 text-[11px]">
                       This is the official institution name.
                     </p>

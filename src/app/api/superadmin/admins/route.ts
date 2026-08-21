@@ -87,10 +87,24 @@ export async function POST(req: NextRequest) {
       }
       targetCollegeId = dept.collegeId;
       targetDepartmentName = dept.departmentName;
-    } else if (targetCollegeId) {
+    }
+
+    if (targetCollegeId) {
       const college = await dataService.getCollegeById(targetCollegeId);
       if (!college) {
         return NextResponse.json({ success: false, message: 'The selected college does not exist.' }, { status: 400 });
+      }
+
+      // Enforce strictly 1 admin per college
+      const existingCollegeAdmins = await dataService.getAdminsByCollegeId(targetCollegeId);
+      if (existingCollegeAdmins && existingCollegeAdmins.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `An admin account (${existingCollegeAdmins[0].email}) already exists for "${college.name}". Only one admin is permitted per college.`,
+          },
+          { status: 409 }
+        );
       }
     }
 

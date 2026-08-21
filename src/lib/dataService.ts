@@ -1738,6 +1738,29 @@ export const dataService = {
     }
   },
 
+  async getAdminsByCollegeId(collegeId: number) {
+    if (isSupabaseConfigured) {
+      try {
+        const { data: admins, error } = await supabase
+          .from('admin_users')
+          .select('id, email, name, active, collegeId, collegeDepartmentId')
+          .eq('collegeId', collegeId);
+        if (!error && admins) return admins;
+      } catch (err) {
+        console.warn('Supabase getAdminsByCollegeId error:', err);
+      }
+    }
+    try {
+      return await db.adminUser.findMany({
+        where: { collegeId },
+        select: { id: true, email: true, name: true, active: true, collegeId: true, collegeDepartmentId: true },
+      });
+    } catch (dbErr) {
+      console.error('Prisma getAdminsByCollegeId fallback failed:', dbErr);
+      return [];
+    }
+  },
+
   async createAdmin(data: {
     email: string;
     passwordHash: string;
