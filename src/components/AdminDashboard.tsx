@@ -35,7 +35,7 @@ interface LeaderboardEntry {
   avgResponseTimeMs: number; lastAttemptDate: string;
 }
 
-type AdminTab = 'questions' | 'reports';
+type AdminTab = 'questions' | 'reports' | 'keys';
 type ReportTab = 'overview' | 'students' | 'attempts' | 'qbank' | 'risk' | 'category' | 'engagement' | 'trend';
 type BulkAction = 'enable' | 'disable' | 'delete' | 'export';
 type BulkStep = 'select' | 'configure' | 'confirm' | 'processing' | 'result';
@@ -172,14 +172,14 @@ function LoginScreen({ onLogin, isLoading }: { onLogin: (email: string, pwd: str
           )}
         </button>
 
-        {/* Super Admin Login Button */}
+        {/* System Admin Login Button */}
         <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 text-center">
           <Link
             href="/superadmin"
-            className="btn btn-secondary btn-sm w-full justify-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+            className="btn btn-secondary btn-sm w-full justify-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >
-            <Key className="w-3.5 h-3.5 text-amber-500" />
-            <span>Login as Super Admin</span>
+            <Key className="w-3.5 h-3.5 text-blue-500" />
+            <span>Login as System Admin</span>
           </Link>
         </div>
 
@@ -1763,10 +1763,19 @@ export default function AdminDashboard() {
   const [leaderboard, setLeaderboard]         = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading]             = useState(false);
 
-  /* Registration Key management modal state */
+  /* Registration Key management state */
   const [keyModalOpen, setKeyModalOpen]       = useState(false);
+  const [targetDeptForEdit, setTargetDeptForEdit] = useState<{ id: number; departmentName: string; registrationKey: string } | null>(null);
   const [newKeyInput, setNewKeyInput]         = useState('');
   const [keyUpdating, setKeyUpdating]         = useState(false);
+  const [adminDepartmentsList, setAdminDepartmentsList] = useState<any[]>([]);
+  const [copiedKeyId, setCopiedKeyId]         = useState<number | string | null>(null);
+
+  /* New department creation modal */
+  const [isNewDeptModalOpen, setIsNewDeptModalOpen] = useState(false);
+  const [newDeptName, setNewDeptName]         = useState('');
+  const [newDeptKey, setNewDeptKey]           = useState('');
+  const [isCreatingDept, setIsCreatingDept]   = useState(false);
 
   /* Tab state */
   const [adminTab, setAdminTab]               = useState<AdminTab>('questions');
@@ -1877,9 +1886,18 @@ export default function AdminDashboard() {
 
       if (regRes && regRes.ok) {
         const regData = await regRes.json();
-        if (regData.success && regData.department) {
-          setAdminDepartment(regData.department);
-          sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(regData.department));
+        if (regData.success) {
+          if (regData.department) {
+            setAdminDepartment(regData.department);
+            sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(regData.department));
+          }
+          if (regData.departments) {
+            setAdminDepartmentsList(regData.departments);
+          }
+          if (regData.college) {
+            setAdminCollege(regData.college);
+            sessionStorage.setItem(ADMIN_COLLEGE_STORAGE_KEY, JSON.stringify(regData.college));
+          }
         }
       }
     } catch {
@@ -1936,8 +1954,25 @@ export default function AdminDashboard() {
     setAdminEmail(null);
     setAdminCollege(null);
     setAdminDepartment(null);
+    setAdminDepartmentsList([]);
     setIsAuthenticated(false);
     toast.success('Admin logged out.');
+  };
+
+  const openEditKeyModal = (dept?: { id: number; departmentName: string; registrationKey: string }) => {
+    const target = dept || adminDepartment;
+    if (!target) return;
+    setTargetDeptForEdit(target);
+    setNewKeyInput(target.registrationKey || '');
+    setKeyModalOpen(true);
+  };
+
+  const handleCopyKey = (key: string, id: number | string) => {
+    if (!key) return;
+    navigator.clipboard.writeText(key);
+    setCopiedKeyId(id);
+    toast.success(`Key "${key}" copied to clipboard!`);
+    setTimeout(() => setCopiedKeyId(null), 2000);
   };
 
   const handleUpdateRegistrationKey = async (e: React.FormEvent) => {
@@ -1949,6 +1984,7 @@ export default function AdminDashboard() {
 
     setKeyUpdating(true);
     try {
+      const targetId = targetDeptForEdit?.id || adminDepartment?.id;
       const res = await fetch('/api/admin/registration-key', {
         method: 'PUT',
         headers: {
@@ -1956,14 +1992,23 @@ export default function AdminDashboard() {
           'x-admin-token': adminToken || '',
           'x-admin-password': adminToken || '',
         },
-        body: JSON.stringify({ registrationKey: newKeyInput.trim() }),
+        body: JSON.stringify({
+          departmentId: targetId,
+          registrationKey: newKeyInput.trim(),
+        }),
       });
       const data = await res.json();
       if (data.success && data.department) {
-        setAdminDepartment(data.department);
-        sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(data.department));
+        if (adminDepartment && adminDepartment.id === data.department.id) {
+          setAdminDepartment(data.department);
+          sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(data.department));
+        }
+        setAdminDepartmentsList(prev =>
+          prev.map(d => (d.id === data.department.id ? { ...d, registrationKey: data.department.registrationKey } : d))
+        );
         setKeyModalOpen(false);
         setNewKeyInput('');
+        setTargetDeptForEdit(null);
         toast.success(data.message || 'Registration key updated successfully!');
       } else {
         toast.error(data.message || 'Failed to update registration key.');
@@ -1972,6 +2017,53 @@ export default function AdminDashboard() {
       toast.error('Network error updating registration key.');
     } finally {
       setKeyUpdating(false);
+    }
+  };
+
+  const handleCreateDepartment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeptName.trim()) {
+      toast.error('Department name is required.');
+      return;
+    }
+    if (!newDeptKey.trim()) {
+      toast.error('Registration key is required.');
+      return;
+    }
+
+    setIsCreatingDept(true);
+    try {
+      const res = await fetch('/api/admin/registration-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': adminToken || '',
+          'x-admin-password': adminToken || '',
+        },
+        body: JSON.stringify({
+          departmentName: newDeptName.trim(),
+          registrationKey: newDeptKey.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.department) {
+        toast.success(data.message || 'Department and key created successfully!');
+        setAdminDepartmentsList(prev => [...prev, data.department]);
+        if (!adminDepartment) {
+          setAdminDepartment(data.department);
+          sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(data.department));
+        }
+        setIsNewDeptModalOpen(false);
+        setNewDeptName('');
+        setNewDeptKey('');
+      } else {
+        toast.error(data.message || 'Failed to create department.');
+      }
+    } catch {
+      toast.error('Network error creating department.');
+    } finally {
+      setIsCreatingDept(false);
     }
   };
 
@@ -2323,7 +2415,213 @@ export default function AdminDashboard() {
         >
           Analytics &amp; Reports
         </button>
+        <button
+          onClick={() => setAdminTab('keys')}
+          className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+            adminTab === 'keys'
+              ? 'border-[#0f172a] text-[#0f172a] dark:border-white dark:text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          <span>Registration Keys</span>
+          {adminDepartmentsList.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+              {adminDepartmentsList.length}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* ════════════════════════════════
+          REGISTRATION KEYS TAB
+      ════════════════════════════════ */}
+      {adminTab === 'keys' && (
+        <div className="space-y-6">
+          {/* Header Action Banner */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-slate-50 dark:from-slate-800/90 dark:via-slate-800/60 dark:to-slate-900 border border-blue-200/80 dark:border-slate-700 shadow-sm">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shrink-0">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  Registration Key Management
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Share these registration keys with students to automatically associate them with your college &amp; department.
+                </p>
+              </div>
+            </div>
+            {(!adminDepartment || adminDepartmentsList.length > 1) && (
+              <button
+                onClick={() => setIsNewDeptModalOpen(true)}
+                className="btn btn-primary btn-sm gap-1.5 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Department &amp; Key</span>
+              </button>
+            )}
+          </div>
+
+          {/* Department Cards or List */}
+          {adminDepartmentsList.length > 0 ? (
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Authorized College Departments ({adminDepartmentsList.length})
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    College: <strong className="text-slate-700 dark:text-slate-300">{adminCollege?.name || 'Assigned Institution'}</strong>
+                  </p>
+                </div>
+              </div>
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {adminDepartmentsList.map((dept: any) => {
+                  const isCopied = copiedKeyId === dept.id;
+                  return (
+                    <div key={dept.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-slate-900 dark:text-white">
+                            {dept.departmentName}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                            Active
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {adminCollege?.name} · {dept.studentCount ? `${dept.studentCount} enrolled students` : 'Ready for student registration'}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl font-mono text-sm font-extrabold text-slate-900 dark:text-white">
+                          <KeyRound className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          <span>{dept.registrationKey}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyKey(dept.registrationKey, dept.id)}
+                          className="btn btn-secondary btn-sm gap-1 text-xs"
+                          title="Copy registration key"
+                        >
+                          {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{isCopied ? 'Copied!' : 'Copy'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditKeyModal(dept)}
+                          className="btn btn-primary btn-sm gap-1 text-xs"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Change Key</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : adminDepartment ? (
+            /* Single Assigned Department View */
+            <div className="card p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Department</span>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
+                    {adminDepartment.departmentName}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Institution: <strong className="text-slate-700 dark:text-slate-300">{adminCollege?.name}</strong>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 font-mono text-base font-extrabold text-blue-700 dark:text-blue-300">
+                    {adminDepartment.registrationKey}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyKey(adminDepartment.registrationKey, adminDepartment.id)}
+                    className="btn btn-secondary btn-sm gap-1.5"
+                  >
+                    {copiedKeyId === adminDepartment.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedKeyId === adminDepartment.id ? 'Copied!' : 'Copy Key'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openEditKeyModal(adminDepartment)}
+                    className="btn btn-primary btn-sm gap-1.5"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Change Registration Key</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* No Department Key Found View */
+            <div className="card p-8 text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">No Registration Key Configured Yet</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+                  Create a department and registration key for <strong className="text-slate-700 dark:text-slate-300">{adminCollege?.name || 'your college'}</strong> so students can tag their accounts.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsNewDeptModalOpen(true)}
+                className="btn btn-primary btn-md gap-2 mx-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Registration Key</span>
+              </button>
+            </div>
+          )}
+
+          {/* How Registration Keys Work Info Card */}
+          <div className="card p-5 sm:p-6 bg-slate-50/60 dark:bg-slate-800/30 space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <span>How Student Registration Keys Work</span>
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs text-slate-600 dark:text-slate-400">
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-1.5">
+                <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold flex items-center justify-center">1</span>
+                  Simple &amp; Flexible Keys
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  Registration keys are NOT passwords. Any readable identifier can be used (e.g. <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded">MITCSE2026</code>, <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded">CSE-MIT</code>).
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-1.5">
+                <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold flex items-center justify-center">2</span>
+                  Authoritative Verification
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  When a student enters the key, the system validates it in real time and automatically resolves their College &amp; Department on save.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-1.5">
+                <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold flex items-center justify-center">3</span>
+                  Permanent Association
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  Rotating or changing a key only affects NEW registrations. Already registered students stay permanently attached to their department.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════════════════════════════════
           QUESTION BANK TAB
@@ -2498,7 +2796,7 @@ export default function AdminDashboard() {
               <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">Change Registration Key</h3>
             </div>
-            <button onClick={() => setKeyModalOpen(false)} className="btn-icon">
+            <button onClick={() => { setKeyModalOpen(false); setTargetDeptForEdit(null); }} className="btn-icon">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -2506,10 +2804,10 @@ export default function AdminDashboard() {
           <form onSubmit={handleUpdateRegistrationKey} className="p-5 space-y-4">
             <div>
               <p className="text-xs text-slate-600 dark:text-slate-300">
-                Department: <strong className="text-slate-900 dark:text-white">{adminDepartment?.departmentName}</strong>
+                Department: <strong className="text-slate-900 dark:text-white">{targetDeptForEdit?.departmentName || adminDepartment?.departmentName}</strong>
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Current Key: <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-slate-800 dark:text-slate-200">{adminDepartment?.registrationKey}</code>
+                Current Key: <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-slate-800 dark:text-slate-200">{targetDeptForEdit?.registrationKey || adminDepartment?.registrationKey}</code>
               </p>
             </div>
 
@@ -2556,6 +2854,83 @@ export default function AdminDashboard() {
               >
                 {keyUpdating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 <span>Save New Key</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {/* Add Department & Key Modal */}
+    {isNewDeptModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Department &amp; Registration Key</h3>
+            </div>
+            <button onClick={() => setIsNewDeptModalOpen(false)} className="btn-icon">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleCreateDepartment} className="p-5 space-y-4">
+            <div>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                College: <strong className="text-slate-900 dark:text-white">{adminCollege?.name || 'Your Assigned College'}</strong>
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="deptNameInput" className="field-label">
+                Department Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="deptNameInput"
+                type="text"
+                value={newDeptName}
+                onChange={e => setNewDeptName(e.target.value)}
+                placeholder="e.g. Information Technology or Mechanical Engineering"
+                className="field-input"
+                autoFocus
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="deptKeyInput" className="field-label">
+                Registration Key <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="deptKeyInput"
+                type="text"
+                value={newDeptKey}
+                onChange={e => setNewDeptKey(e.target.value)}
+                placeholder="e.g. MITIT2026 or ABCMECH"
+                className="field-input font-mono"
+                required
+              />
+              <p className="field-helper text-[11px] mt-1">
+                Enter the unique code you will distribute to students in this department.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsNewDeptModalOpen(false)}
+                className="btn btn-secondary btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isCreatingDept || !newDeptName.trim() || !newDeptKey.trim()}
+                className="btn btn-primary btn-sm gap-1.5"
+              >
+                {isCreatingDept ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Create Department</span>
               </button>
             </div>
           </form>

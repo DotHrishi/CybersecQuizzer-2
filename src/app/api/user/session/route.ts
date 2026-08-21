@@ -48,26 +48,47 @@ export async function POST(req: NextRequest) {
     }
 
     // Backend enforcement: Check 5-day grace period for valid registration key & password
-    const profile = await dataService.getUserProfile(userName);
+    const cleanUser = userName.trim();
+    const profile = await dataService.getUserProfile(cleanUser);
+
     if (profile) {
       const graceStatus = getStudentGracePeriodStatus(profile);
       if (graceStatus.isBeyondGracePeriod) {
         if (!profile.collegeDepartmentId) {
           return NextResponse.json({
             success: true,
-            userName,
+            userName: cleanUser,
             guardState: 'REGISTRATION_KEY_REQUIRED',
             isOpen: false,
-            message: 'A valid registration key is required to continue. Please update your profile with the key provided by your college/department administrator.',
+            message: 'A valid registration key is required to continue. Please complete your profile with the key provided by your college/department administrator.',
           });
         }
         if (!profile.passwordHash) {
           return NextResponse.json({
             success: true,
-            userName,
+            userName: cleanUser,
             guardState: 'PASSWORD_REQUIRED',
             isOpen: false,
             message: 'Please set a secure password in your profile to continue using the application.',
+          });
+        }
+      }
+    } else {
+      // If no profile record exists yet, check if student has historical attempts older than 5 days
+      const userAttempts = await dataService.getUserAttempts(cleanUser);
+      if (userAttempts && userAttempts.length > 0) {
+        const earliest = userAttempts.reduce((earliest: Date, a: any) => {
+          const d = new Date(a.createdAt || a.quizDate);
+          return d < earliest ? d : earliest;
+        }, new Date());
+        const graceStatus = getStudentGracePeriodStatus(earliest);
+        if (graceStatus.isBeyondGracePeriod) {
+          return NextResponse.json({
+            success: true,
+            userName: cleanUser,
+            guardState: 'PROFILE_INCOMPLETE',
+            isOpen: false,
+            message: 'Your 5-day grace period has expired. Please complete your student profile with your college registration key and password to continue.',
           });
         }
       }

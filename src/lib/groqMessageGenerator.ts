@@ -37,6 +37,21 @@ const FALLBACK_MESSAGES: Record<QuizStatusState, string[]> = {
     "Your response has been secured in the vault. Check the leaderboard and prepare for tomorrow's 10 AM IST quiz!",
     "Mission accomplished for today! Return tomorrow at 10:00 AM IST to maintain your streak."
   ],
+  REGISTRATION_KEY_REQUIRED: [
+    "A valid department registration key is required to proceed. Please enter your college key in your profile.",
+    "Your 5-day grace period has ended. Obtain your registration key from your department admin to unlock the quiz.",
+    "Registration key required! Connect your account to your institution's department to continue playing."
+  ],
+  PASSWORD_REQUIRED: [
+    "Please set a secure student password in your profile to safeguard your account and continue.",
+    "Password required! Add a secure password to your student profile to attempt today's quiz.",
+    "Account security check: please configure your student profile password to continue."
+  ],
+  PROFILE_INCOMPLETE: [
+    "Your 5-day grace period has ended. Please complete your profile with your department registration key and password.",
+    "Profile completion required! Update your student details to participate in today's daily quiz.",
+    "Action required: finalize your college department registration key and password to unlock today's challenge."
+  ],
   OPEN: [
     "Today's quiz is LIVE! Good luck defender!",
     "System operational! Answer quickly before 11:00 AM IST for Early Bird bonus points!"

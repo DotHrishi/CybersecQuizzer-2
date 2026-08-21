@@ -89,6 +89,10 @@ export function getStudentGracePeriodStatus(
   isWithinGracePeriod: boolean;
   requiresCollegeSetup: boolean;
   requiresRegistrationKeySetup: boolean;
+  requiresPassword: boolean;
+  isComplete: boolean;
+  hasValidDepartment: boolean;
+  hasPassword: boolean;
   daysRemaining: number;
   hoursRemaining: number;
 } {
@@ -99,7 +103,7 @@ export function getStudentGracePeriodStatus(
   if (input && typeof input === 'object' && !(input instanceof Date)) {
     createdAt = input.createdAt;
     hasValidDepartment = Boolean(input.collegeDepartmentId || input.collegeDepartment?.id);
-    hasPassword = Boolean(input.passwordHash);
+    hasPassword = Boolean(input.passwordHash && input.passwordHash.trim().length > 0);
   } else {
     createdAt = input as Date | string;
   }
@@ -110,6 +114,10 @@ export function getStudentGracePeriodStatus(
       isWithinGracePeriod: true,
       requiresCollegeSetup: false,
       requiresRegistrationKeySetup: false,
+      requiresPassword: false,
+      isComplete: hasValidDepartment && hasPassword,
+      hasValidDepartment,
+      hasPassword,
       daysRemaining: STUDENT_GRACE_PERIOD_DAYS,
       hoursRemaining: STUDENT_GRACE_PERIOD_DAYS * 24,
     };
@@ -125,13 +133,19 @@ export function getStudentGracePeriodStatus(
   const hoursRemaining = Math.ceil(msRemaining / (1000 * 60 * 60));
   const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
 
-  const requiresSetup = isBeyond && (!hasValidDepartment || !hasPassword);
+  const requiresRegKey = isBeyond && !hasValidDepartment;
+  const requiresPwd = isBeyond && !hasPassword;
+  const isComplete = hasValidDepartment && hasPassword;
 
   return {
     isBeyondGracePeriod: isBeyond,
     isWithinGracePeriod: !isBeyond,
-    requiresCollegeSetup: requiresSetup,
-    requiresRegistrationKeySetup: requiresSetup,
+    requiresCollegeSetup: requiresRegKey,
+    requiresRegistrationKeySetup: requiresRegKey,
+    requiresPassword: requiresPwd,
+    isComplete,
+    hasValidDepartment,
+    hasPassword,
     daysRemaining,
     hoursRemaining,
   };

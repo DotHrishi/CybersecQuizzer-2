@@ -66,7 +66,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Backend enforcement: Check 5-day grace period for valid registration key & password
-    const profile = await dataService.getUserProfile(session.userName);
+    const cleanSessionUser = session.userName.trim();
+    const profile = await dataService.getUserProfile(cleanSessionUser);
+
     if (profile) {
       const graceStatus = getStudentGracePeriodStatus(profile);
       if (graceStatus.isBeyondGracePeriod) {
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest) {
             {
               success: false,
               state: 'REGISTRATION_KEY_REQUIRED',
-              message: 'A valid registration key is required to continue. Please update your profile with the key provided by your college/department administrator.',
+              message: 'A valid registration key is required to continue. Please complete your profile with the key provided by your college/department administrator.',
             },
             { status: 403 }
           );
@@ -88,6 +90,26 @@ export async function POST(req: NextRequest) {
               success: false,
               state: 'PASSWORD_REQUIRED',
               message: 'Please set a secure password in your profile to continue using the application.',
+            },
+            { status: 403 }
+          );
+        }
+      }
+    } else {
+      const userAttempts = await dataService.getUserAttempts(cleanSessionUser);
+      if (userAttempts && userAttempts.length > 0) {
+        const earliest = userAttempts.reduce((earliest: Date, a: any) => {
+          const d = new Date(a.createdAt || a.quizDate);
+          return d < earliest ? d : earliest;
+        }, new Date());
+        const graceStatus = getStudentGracePeriodStatus(earliest);
+        if (graceStatus.isBeyondGracePeriod) {
+          activeSessions.delete(sessionId);
+          return NextResponse.json(
+            {
+              success: false,
+              state: 'PROFILE_INCOMPLETE',
+              message: 'Your 5-day grace period has expired. Please complete your student profile with your college registration key and password to continue.',
             },
             { status: 403 }
           );

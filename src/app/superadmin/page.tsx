@@ -1,8 +1,8 @@
 import SuperAdminDashboard from '@/components/SuperAdminDashboard';
 
 export const metadata = {
-  title: 'Super Admin Portal | Cybersecurity Awareness & Digital Safety Programme',
-  description: 'Manage admin accounts and question bank credentials',
+  title: 'System Admin Portal | Cybersecurity Awareness & Digital Safety Programme',
+  description: 'Manage admin accounts and institution credentials',
   robots: {
     index: false,
     follow: false,

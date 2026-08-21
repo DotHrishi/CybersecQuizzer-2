@@ -26,7 +26,15 @@ export interface QuizResultDTO {
   message: string;
 }
 
-export type QuizStatusState = 'OPEN' | 'BEFORE_WINDOW' | 'AFTER_WINDOW' | 'WEEKEND' | 'ALREADY_ATTEMPTED';
+export type QuizStatusState =
+  | 'OPEN'
+  | 'BEFORE_WINDOW'
+  | 'AFTER_WINDOW'
+  | 'WEEKEND'
+  | 'ALREADY_ATTEMPTED'
+  | 'REGISTRATION_KEY_REQUIRED'
+  | 'PASSWORD_REQUIRED'
+  | 'PROFILE_INCOMPLETE';
 
 export interface QuizStatusResponse {
   state: QuizStatusState;

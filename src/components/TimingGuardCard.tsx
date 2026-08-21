@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Clock, Calendar, CheckCircle2, Trophy, BarChart2,
   ShieldAlert, Sparkles, ArrowRight, Timer, User, Shield,
+  KeyRound, Lock, AlertTriangle, AlertCircle
 } from 'lucide-react';
 import { QuizStatusState } from '@/types/quiz';
 
@@ -70,7 +71,125 @@ const STATE_CONFIG: Record<
     subtitle: 'Your response for today has been saved',
     broadcastBg: '',
   },
+  REGISTRATION_KEY_REQUIRED: {
+    icon: KeyRound,
+    iconBg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50 text-blue-600 dark:text-blue-400',
+    badge: 'badge-blue',
+    badgeText: 'Action Required',
+    title: 'Registration Key Required',
+    subtitle: '5-day grace period has expired',
+    broadcastBg: 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-200/80 dark:border-blue-900/40 text-blue-900 dark:text-blue-200',
+  },
+  PASSWORD_REQUIRED: {
+    icon: Lock,
+    iconBg: 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400',
+    badge: 'badge-red',
+    badgeText: 'Action Required',
+    title: 'Password Required',
+    subtitle: 'Secure your student profile to continue',
+    broadcastBg: 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-200/80 dark:border-rose-900/40 text-rose-900 dark:text-rose-200',
+  },
+  PROFILE_INCOMPLETE: {
+    icon: AlertCircle,
+    iconBg: 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400',
+    badge: 'badge-blue',
+    badgeText: 'Profile Incomplete',
+    title: 'Complete Your Profile',
+    subtitle: 'Mandatory profile completion is required to attempt the quiz',
+    broadcastBg: 'bg-indigo-50/80 dark:bg-indigo-950/30 border-indigo-200/80 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-200',
+  },
 };
+
+/* ── Profile Incomplete Card ───────────────────────────── */
+function ProfileRequiredCard({
+  state,
+  message,
+  userName,
+}: {
+  state: 'REGISTRATION_KEY_REQUIRED' | 'PASSWORD_REQUIRED' | 'PROFILE_INCOMPLETE';
+  message: string;
+  userName?: string;
+}) {
+  const isKeyRequired = state === 'REGISTRATION_KEY_REQUIRED' || state === 'PROFILE_INCOMPLETE';
+  const isPwdRequired = state === 'PASSWORD_REQUIRED' || state === 'PROFILE_INCOMPLETE';
+
+  return (
+    <div className="max-w-xl mx-auto my-8 card p-6 sm:p-8 space-y-6 border-2 border-blue-400/80 dark:border-blue-700/80 shadow-lg bg-white dark:bg-slate-900">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-700 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner">
+          <KeyRound className="w-7 h-7" />
+        </div>
+        <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 text-[11px] font-bold uppercase tracking-wider border border-blue-200 dark:border-blue-800">
+          Mandatory Profile Completion
+        </span>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+            Please Complete Your Profile Before Continuing
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1.5">
+            Your 5-day grace period has concluded. To access today&apos;s daily quiz and keep your scores recorded on the institutional leaderboard, please complete the required profile details.
+          </p>
+        </div>
+      </div>
+
+      {/* Checklist */}
+      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs">
+        <p className="font-bold text-slate-900 dark:text-white text-[11px] uppercase tracking-wider">
+          Required Information Checklist:
+        </p>
+
+        <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${isKeyRequired ? 'bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/60' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+          <div className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-700 dark:text-blue-300 shrink-0 mt-0.5 font-bold text-[11px]">
+            1
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900 dark:text-white">College / Department Registration Key</p>
+            <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
+              Obtain the registration key (e.g., <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.2 rounded border">MITCSE2026</code>) from your department or college administrator.
+            </p>
+          </div>
+        </div>
+
+        <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${isPwdRequired ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+          <div className="w-5 h-5 rounded-md bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-700 dark:text-emerald-300 shrink-0 mt-0.5 font-bold text-[11px]">
+            2
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900 dark:text-white">Secure Student Password</p>
+            <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
+              Set a password with minimum 8 characters containing at least 1 uppercase letter, 1 lowercase letter, and 1 number.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {message && (
+        <div className="p-3 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/30 text-blue-900 dark:text-blue-200 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-blue-600" />
+          <span>{message}</span>
+        </div>
+      )}
+
+      {/* CTA Button */}
+      <div className="pt-2 flex flex-col sm:flex-row gap-3">
+        <Link
+          href="/profile"
+          className="flex-1 btn btn-primary btn-md justify-center gap-2 text-sm font-bold shadow-md"
+        >
+          <User className="w-4 h-4" />
+          <span>Complete Profile Now</span>
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+        <Link
+          href="/leaderboard"
+          className="btn btn-secondary btn-md justify-center text-xs"
+        >
+          View Leaderboard
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 /* ── Weekend card ──────────────────────────────────────── */
 function WeekendCard({ message }: { message: string }) {
@@ -192,10 +311,16 @@ function WeekendCard({ message }: { message: string }) {
 export default function TimingGuardCard({ state, message, userName, attempt }: TimingGuardCardProps) {
   if (state === 'OPEN') return null;
 
+  /* Profile completion required states get dedicated mandatory completion UI */
+  if (state === 'REGISTRATION_KEY_REQUIRED' || state === 'PASSWORD_REQUIRED' || state === 'PROFILE_INCOMPLETE') {
+    return <ProfileRequiredCard state={state} message={message} userName={userName} />;
+  }
+
   /* Weekend gets its own dedicated layout */
   if (state === 'WEEKEND') return <WeekendCard message={message} />;
 
   const cfg = STATE_CONFIG[state];
+  if (!cfg) return null;
   const Icon = cfg.icon;
   const isAttempted = state === 'ALREADY_ATTEMPTED';
 

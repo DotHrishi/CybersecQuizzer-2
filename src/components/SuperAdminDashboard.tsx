@@ -192,7 +192,7 @@ export default function SuperAdminDashboard() {
       });
 
       if (res.status === 401) {
-        toast.error('Super Admin session expired. Please log in again.');
+        toast.error('System Admin session expired. Please log in again.');
         sessionStorage.removeItem(STORAGE_KEY);
         setToken(null);
         setIsAuthenticated(false);
@@ -248,7 +248,7 @@ export default function SuperAdminDashboard() {
       });
 
       if (res.status === 401) {
-        toast.error('Super Admin session expired. Please log in again.');
+        toast.error('System Admin session expired. Please log in again.');
         sessionStorage.removeItem(STORAGE_KEY);
         setToken(null);
         setIsAuthenticated(false);
@@ -276,7 +276,7 @@ export default function SuperAdminDashboard() {
     }
   }, [isAuthenticated, token, fetchColleges, fetchDepartments, fetchAdmins]);
 
-  /* ── Super Admin Login ── */
+  /* ── System Admin Login ── */
   const handleSuperAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!masterPassword.trim()) return;
@@ -295,7 +295,7 @@ export default function SuperAdminDashboard() {
         setToken(data.token);
         setIsAuthenticated(true);
         setMasterPassword('');
-        toast.success('Super Admin authenticated successfully.');
+        toast.success('System Admin authenticated successfully.');
         fetchColleges(data.token);
         fetchDepartments(data.token);
         fetchAdmins(data.token);
@@ -314,7 +314,7 @@ export default function SuperAdminDashboard() {
     sessionStorage.removeItem(STORAGE_KEY);
     setToken(null);
     setIsAuthenticated(false);
-    toast.success('Super Admin logged out.');
+    toast.success('System Admin logged out.');
   };
 
   /* ── Create College ── */
@@ -745,18 +745,18 @@ export default function SuperAdminDashboard() {
   const totalConfiguredColleges = nonDummyColleges.length;
   const totalDepartments = departments.length;
 
-  /* ── Top Header Component for SuperAdmin Portal ── */
+  /* ── Top Header Component for SystemAdmin Portal ── */
   const SuperAdminHeader = () => (
     <header className="w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md sticky top-0 z-30 mb-8 shadow-xs">
       <div className="max-w-6xl mx-auto px-4 h-16 sm:h-20 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-amber-600/10 border border-amber-500/30 flex items-center justify-center shadow-inner">
-            <Key className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center shadow-inner">
+            <Key className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div>
-            <div className="text-xs font-black tracking-widest uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              Super Admin Console
+            <div className="text-xs font-black tracking-widest uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              System Admin Console
             </div>
             <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
               Cybersecurity Awareness &amp; Digital Safety Programme
@@ -780,16 +780,16 @@ export default function SuperAdminDashboard() {
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             {theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-amber-400" />
+              <Sun className="w-4 h-4 text-emerald-400" />
             ) : (
-              <Moon className="w-4 h-4 text-indigo-500" />
+              <Moon className="w-4 h-4 text-blue-500" />
             )}
           </button>
 
           {isAuthenticated && (
             <button
               onClick={handleLogout}
-              title="Log out of Super Admin"
+              title="Log out of System Admin"
               className="btn btn-secondary btn-xs sm:btn-sm gap-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -806,7 +806,7 @@ export default function SuperAdminDashboard() {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-slate-700 dark:text-slate-300" />
-        <p className="text-xs text-slate-500 font-medium">Verifying super admin security token...</p>
+        <p className="text-xs text-slate-500 font-medium">Verifying system admin security token...</p>
       </div>
     );
   }
@@ -819,20 +819,20 @@ export default function SuperAdminDashboard() {
 
         <div className="max-w-md mx-auto my-8 px-4 w-full">
           <div className="card p-8 border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900 text-center space-y-6 relative overflow-hidden">
-            <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-            <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -top-16 -right-16 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
 
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500/20 to-indigo-500/20 border border-amber-500/30 flex items-center justify-center shadow-inner">
-              <Key className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 flex items-center justify-center shadow-inner">
+              <Key className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
             </div>
 
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 mb-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 mb-2">
                 <ShieldAlert className="w-3 h-3" />
-                Super Admin Access Only
+                System Admin Access Only
               </div>
               <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Super Admin Gateway
+                System Admin Gateway
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
                 Enter your master password to configure colleges, departments, registration keys, and administrators.
@@ -842,7 +842,7 @@ export default function SuperAdminDashboard() {
             <form onSubmit={handleSuperAdminLogin} className="space-y-4 text-left">
               <div>
                 <label className="field-label flex items-center justify-between">
-                  <span>Super Admin Master Key</span>
+                  <span>System Admin Master Key</span>
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -879,14 +879,14 @@ export default function SuperAdminDashboard() {
                 ) : (
                   <>
                     <ShieldCheck className="w-4 h-4" />
-                    Authenticate Super Admin
+                    Authenticate System Admin
                   </>
                 )}
               </button>
             </form>
 
             <div className="pt-3 text-[11px] text-slate-400 border-t border-slate-100 dark:border-slate-800/80">
-              <Link href="/admin" className="text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1">
+              <Link href="/admin" className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1">
                 <ArrowLeft className="w-3 h-3" />
                 Go to normal Admin Login (/admin)
               </Link>
@@ -895,13 +895,13 @@ export default function SuperAdminDashboard() {
         </div>
 
         <div className="text-center text-xs text-slate-400 pb-4">
-          Cybersecurity Awareness &amp; Digital Safety Programme • Super Admin Portal
+          Cybersecurity Awareness &amp; Digital Safety Programme • System Admin Portal
         </div>
       </div>
     );
   }
 
-  /* ── 3. Authenticated Super Admin Dashboard ── */
+  /* ── 3. Authenticated System Admin Dashboard ── */
   return (
     <div className="min-h-screen pb-12">
       <SuperAdminHeader />
@@ -978,13 +978,13 @@ export default function SuperAdminDashboard() {
             onClick={() => setActiveTab('colleges')}
             className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'colleges'
-                ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-extrabold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <School className="w-4 h-4" />
             <span>Colleges &amp; Schools</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
               {totalConfiguredColleges}
             </span>
           </button>
@@ -993,13 +993,13 @@ export default function SuperAdminDashboard() {
             onClick={() => setActiveTab('departments')}
             className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'departments'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-extrabold'
+                ? 'border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400 font-extrabold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Layers className="w-4 h-4" />
             <span>Departments &amp; Keys</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
               {totalDepartments}
             </span>
           </button>
@@ -1008,7 +1008,7 @@ export default function SuperAdminDashboard() {
             onClick={() => setActiveTab('admins')}
             className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'admins'
-                ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                ? 'border-slate-900 text-slate-900 dark:border-slate-100 dark:text-white font-extrabold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
@@ -1026,17 +1026,17 @@ export default function SuperAdminDashboard() {
             onClick={() => setActiveTab('colleges')}
             className={`card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] ${
               activeTab === 'colleges'
-                ? 'ring-2 ring-amber-500 border-amber-300 dark:border-amber-700 shadow-md'
-                : 'border-amber-200/60 dark:border-amber-900/40 hover:border-amber-400'
+                ? 'ring-2 ring-blue-500 border-blue-300 dark:border-blue-700 shadow-md'
+                : 'border-blue-200/60 dark:border-blue-900/40 hover:border-blue-400'
             }`}
           >
             <div>
-              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Colleges</p>
-              <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{totalConfiguredColleges}</p>
+              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Colleges</p>
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{totalConfiguredColleges}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Active institutions</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center">
-              <School className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
+              <School className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
 
@@ -1044,17 +1044,17 @@ export default function SuperAdminDashboard() {
             onClick={() => setActiveTab('departments')}
             className={`card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] ${
               activeTab === 'departments'
-                ? 'ring-2 ring-blue-500 border-blue-300 dark:border-blue-700 shadow-md'
-                : 'border-blue-200/60 dark:border-blue-900/40 hover:border-blue-400'
+                ? 'ring-2 ring-emerald-500 border-emerald-300 dark:border-emerald-700 shadow-md'
+                : 'border-emerald-200/60 dark:border-emerald-900/40 hover:border-emerald-400'
             }`}
           >
             <div>
-              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Departments &amp; Keys</p>
-              <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{totalDepartments}</p>
+              <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Departments &amp; Keys</p>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{totalDepartments}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Active registration keys</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
-              <KeyRound className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
+              <KeyRound className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
 
@@ -1181,7 +1181,7 @@ export default function SuperAdminDashboard() {
                           <td className="table-td font-semibold text-slate-900 dark:text-white">
                             <div>
                               <div className="flex items-center gap-2">
-                                <Building2 className="w-4 h-4 text-amber-500 shrink-0" />
+                                <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                                 <span>{c.name}</span>
                                 {isDummy && (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
@@ -1242,7 +1242,7 @@ export default function SuperAdminDashboard() {
                                       setNewDeptRegKey('');
                                       setAddDepartmentModalOpen(true);
                                     }}
-                                    className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1"
+                                    className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
                                   >
                                     <KeyRound className="w-3 h-3" /> + Add Department &amp; Registration Key
                                   </button>
@@ -1304,7 +1304,7 @@ export default function SuperAdminDashboard() {
                                     setEditCollegeIdentifier(c.identifier);
                                   }}
                                   title="Edit College"
-                                  className="btn-icon text-slate-600 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400"
+                                  className="btn-icon text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
                                 >
                                   <Edit3 className="w-3.5 h-3.5" />
                                 </button>
@@ -1334,7 +1334,7 @@ export default function SuperAdminDashboard() {
           <div className="card overflow-hidden">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/20">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">Departments &amp; Registration Keys</h2>
                 <span className="text-xs text-slate-400">({filteredDepartments.length})</span>
               </div>
@@ -1426,7 +1426,7 @@ export default function SuperAdminDashboard() {
                       <tr key={dept.id} className="table-row">
                         <td className="table-td font-semibold text-slate-900 dark:text-white">
                           <div className="flex items-center gap-1.5">
-                            <Building2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                             <span>{dept.college?.name || 'Unknown College'}</span>
                           </div>
                         </td>
@@ -1437,7 +1437,7 @@ export default function SuperAdminDashboard() {
 
                         <td className="table-td font-mono text-xs">
                           <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 font-black text-blue-700 dark:text-blue-300 shadow-xs">
+                            <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 font-black text-emerald-700 dark:text-emerald-300 shadow-xs">
                               {dept.registrationKey}
                             </span>
                             <button
@@ -1471,7 +1471,7 @@ export default function SuperAdminDashboard() {
                                 setEditDeptRegKey(dept.registrationKey);
                               }}
                               title="Edit Department / Key"
-                              className="btn-icon text-slate-600 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400"
+                              className="btn-icon text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -1611,7 +1611,7 @@ export default function SuperAdminDashboard() {
                         <td className="table-td text-slate-800 dark:text-slate-200 font-medium">
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5">
-                              <Building2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                               <span>{admin.college?.name || <span className="text-slate-400 italic">Unassigned (Global)</span>}</span>
                             </div>
                             {admin.collegeDepartment && (
@@ -1688,8 +1688,8 @@ export default function SuperAdminDashboard() {
             <div className="modal-panel max-w-[520px]">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950 flex items-center justify-center">
-                    <School className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
+                    <School className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">Configure New College / School</h3>
