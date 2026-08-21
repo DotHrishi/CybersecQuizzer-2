@@ -168,10 +168,9 @@ export default function SuperAdminDashboard() {
 
   /* Combined Admin Creation Modal */
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
-  const [newAdminCollegeId, setNewAdminCollegeId] = useState<number | ''>('');
-  const [newAdminDeptId, setNewAdminDeptId] = useState<number | ''>('');
   const [newPassword, setNewPassword] = useState('');
   const [newActive, setNewActive] = useState(true);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -576,23 +575,12 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  /* ── Create Admin & College in Combined Single Step ── */
+  /* ── Create Admin, College & Department in Combined Single Step ── */
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCollegeName.trim() || !newEmail.trim() || !newPassword.trim()) {
-      toast.error('College Name, Admin Email, and Password are all required.');
+    if (!newCollegeName.trim() || !newDepartmentName.trim() || !newEmail.trim() || !newPassword.trim()) {
+      toast.error('College Name, Department Name, Admin Email, and Password are all required.');
       return;
-    }
-
-    const existingCollege = nonDummyColleges.find(
-      c => c.name.toLowerCase() === newCollegeName.trim().toLowerCase()
-    );
-    if (existingCollege) {
-      const existingAdminForCol = admins.find(a => a.collegeId === existingCollege.id);
-      if (existingAdminForCol) {
-        toast.error(`"${existingCollege.name}" already has an assigned admin (${existingAdminForCol.email}). Only one admin is permitted per college.`);
-        return;
-      }
     }
 
     setIsSavingAdmin(true);
@@ -605,6 +593,7 @@ export default function SuperAdminDashboard() {
         },
         body: JSON.stringify({
           collegeName: newCollegeName.trim(),
+          departmentName: newDepartmentName.trim(),
           email: newEmail.trim().toLowerCase(),
           name: newAdminName.trim() || undefined,
           password: newPassword,
@@ -614,7 +603,7 @@ export default function SuperAdminDashboard() {
 
       const data = await res.json();
       if (data.success) {
-        toast.success(`Admin account created for "${newEmail}"!`);
+        toast.success(`Admin account created for "${newEmail}" (${newDepartmentName.trim()})!`);
         setAddModalOpen(false);
         setCreatedCredsModal({
           collegeName: data.admin?.college?.name || newCollegeName.trim(),
@@ -625,11 +614,9 @@ export default function SuperAdminDashboard() {
           loginUrl: `${window.location.origin}/admin`,
         });
         setNewCollegeName('');
-        setNewCollegeIdentifier('');
+        setNewDepartmentName('');
         setNewEmail('');
         setNewAdminName('');
-        setNewAdminCollegeId('');
-        setNewAdminDeptId('');
         setNewPassword('');
         setNewActive(true);
         fetchAdmins();
@@ -777,10 +764,6 @@ export default function SuperAdminDashboard() {
     }
     return true;
   });
-
-  const availableDeptsForNewAdmin = newAdminCollegeId
-    ? departments.filter(d => d.collegeId === Number(newAdminCollegeId))
-    : [];
 
   const totalAdmins = admins.length;
   const activeAdmins = admins.filter(a => a.active).length;
@@ -1099,7 +1082,7 @@ export default function SuperAdminDashboard() {
                     type="text"
                     value={collegeSearch}
                     onChange={e => setCollegeSearch(e.target.value)}
-                    placeholder="Search college, dept or key..."
+                    placeholder="Search college name..."
                     className="field-input pl-8 py-1.5 text-xs w-full"
                   />
                   {collegeSearch && (
@@ -1127,9 +1110,7 @@ export default function SuperAdminDashboard() {
               <table className="table-base">
                 <thead className="table-head">
                   <tr>
-                    <th className="table-th">Official College &amp; Active Keys</th>
-                    <th className="table-th">Identifier Code</th>
-                    <th className="table-th text-center">Departments</th>
+                    <th className="table-th">College / School</th>
                     <th className="table-th text-center">Admins</th>
                     <th className="table-th text-center">Enrolled Students</th>
                     <th className="table-th text-right">Actions</th>
@@ -1140,8 +1121,6 @@ export default function SuperAdminDashboard() {
                     Array.from({ length: 3 }).map((_, i) => (
                       <tr key={i} className="border-b border-slate-100 dark:border-slate-800 animate-pulse">
                         <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-48" /></td>
-                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-20" /></td>
-                        <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-12 mx-auto" /></td>
                         <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-12 mx-auto" /></td>
                         <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-12 mx-auto" /></td>
                         <td className="table-td text-right"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-16 ml-auto" /></td>
@@ -1149,7 +1128,7 @@ export default function SuperAdminDashboard() {
                     ))
                   ) : filteredColleges.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                      <td colSpan={4} className="py-12 text-center text-slate-400">
                         <div className="max-w-xs mx-auto space-y-3">
                           <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                             <School className="w-6 h-6 text-slate-400" />
@@ -1158,7 +1137,7 @@ export default function SuperAdminDashboard() {
                             {collegeSearch ? 'No colleges match your search.' : 'No colleges configured yet.'}
                           </p>
                           <p className="text-xs text-slate-400 leading-relaxed">
-                            Click &quot;Configure College&quot; to add participating institutions.
+                            Click &quot;+ Add New College Admin&quot; to add a college and its administrator.
                           </p>
                         </div>
                       </td>
@@ -1166,76 +1145,36 @@ export default function SuperAdminDashboard() {
                   ) : (
                     filteredColleges.map(c => {
                       const isDummy = c.identifier === 'DUMMY' || c.name === 'Enter-your-college';
-                      const collegeDepts = c.departments || [];
                       return (
                         <tr key={c.id} className="table-row">
                           <td className="table-td font-semibold text-slate-900 dark:text-white">
-                            <div>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                                <Building2 className="w-4 h-4" />
+                              </div>
                               <div className="flex items-center gap-2">
-                                <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                                <span>{c.name}</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{c.name}</span>
                                 {isDummy && (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                                     Default Placeholder
                                   </span>
                                 )}
                               </div>
-
-                              {/* Associated Departments & Registration Keys Badges */}
-                              {!isDummy && collegeDepts.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-6">
-                                  {collegeDepts.map(d => (
-                                    <span
-                                      key={d.id}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 text-blue-900 dark:text-blue-200"
-                                    >
-                                      <Tag className="w-3 h-3 text-blue-500" />
-                                      <span className="font-semibold text-slate-700 dark:text-slate-300">{d.departmentName}:</span>
-                                      <code className="font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-100/70 dark:bg-blue-900/60 px-1 rounded">{d.registrationKey}</code>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          navigator.clipboard.writeText(d.registrationKey);
-                                          toast.success(`Key "${d.registrationKey}" copied!`);
-                                        }}
-                                        title="Copy registration key"
-                                        className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200 ml-0.5 p-0.5"
-                                      >
-                                        <Copy className="w-2.5 h-2.5" />
-                                      </button>
-                                    </span>
-                                  ))}
-
-                                </div>
-                              )}
-
-                              {!isDummy && collegeDepts.length === 0 && (
-                                <p className="mt-1 pl-6 text-[11px] text-slate-400 italic">
-                                  Departments &amp; keys can be added by the college admin in their admin panel.
-                                </p>
-                              )}
                             </div>
                           </td>
 
-                          <td className="table-td font-mono text-xs text-slate-700 dark:text-slate-300">
-                            <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold">
-                              {c.identifier}
+                          <td className="table-td text-center">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
+                              <User className="w-3.5 h-3.5 text-blue-500" />
+                              <span>{c._count?.admins ?? 0}</span>
                             </span>
                           </td>
 
-                          <td className="table-td text-center text-xs font-bold text-slate-700 dark:text-slate-300">
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                              {collegeDepts.length}
+                          <td className="table-td text-center">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60">
+                              <GraduationCap className="w-3.5 h-3.5 text-emerald-500" />
+                              <span>{c._count?.students ?? 0}</span>
                             </span>
-                          </td>
-
-                          <td className="table-td text-center text-xs font-bold text-blue-600 dark:text-blue-400">
-                            {c._count?.admins ?? 0}
-                          </td>
-
-                          <td className="table-td text-center text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            {c._count?.students ?? 0}
                           </td>
 
                           <td className="table-td text-right">
@@ -1249,7 +1188,7 @@ export default function SuperAdminDashboard() {
                                     setEditCollegeName(c.name);
                                     setEditCollegeIdentifier(c.identifier);
                                   }}
-                                  title="Edit College"
+                                  title="Edit College Name"
                                   className="btn-icon text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
                                 >
                                   <Edit3 className="w-3.5 h-3.5" />
@@ -1341,7 +1280,7 @@ export default function SuperAdminDashboard() {
                 <thead className="table-head">
                   <tr>
                     <th className="table-th">Admin Email</th>
-                    <th className="table-th">College &amp; Department Scope</th>
+                    <th className="table-th">College &amp; Department</th>
                     <th className="table-th text-center">Status</th>
                     <th className="table-th">Created Date</th>
                     <th className="table-th text-right">Actions</th>
@@ -1369,7 +1308,7 @@ export default function SuperAdminDashboard() {
                             {searchTerm ? 'No admins matching filter.' : 'No admin credentials registered yet.'}
                           </p>
                           <p className="text-xs text-slate-400 leading-relaxed">
-                            Click &quot;Add New Admin&quot; to provision an admin for a college/department.
+                            Click &quot;+ Add New College Admin&quot; to provision an admin for a college department.
                           </p>
                         </div>
                       </td>
@@ -1395,11 +1334,11 @@ export default function SuperAdminDashboard() {
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5">
                               <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                              <span>{admin.college?.name || <span className="text-slate-400 italic">Unassigned (Global)</span>}</span>
+                              <span className="font-semibold">{admin.college?.name || <span className="text-slate-400 italic">Unassigned (Global)</span>}</span>
                             </div>
                             {admin.collegeDepartment && (
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-5">
-                                Department: <strong className="text-slate-700 dark:text-slate-300">{admin.collegeDepartment.departmentName}</strong> (Key: <code className="font-mono">{admin.collegeDepartment.registrationKey}</code>)
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-5 font-normal">
+                                Dept: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{admin.collegeDepartment.departmentName}</strong>
                               </p>
                             )}
                           </div>
@@ -1475,8 +1414,8 @@ export default function SuperAdminDashboard() {
                     <UserPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Configure New College &amp; Admin</h3>
-                    <p className="text-[11px] text-slate-500">Provision institution and college admin credentials in a single step</p>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Configure College, Department &amp; Admin</h3>
+                    <p className="text-[11px] text-slate-500">Provision institution, department, and administrator credentials in one step</p>
                   </div>
                 </div>
                 <button onClick={() => setAddModalOpen(false)} className="btn-icon">
@@ -1485,22 +1424,44 @@ export default function SuperAdminDashboard() {
               </div>
 
               <form onSubmit={handleCreateAdmin} className="p-6 space-y-4">
-                {/* ── Section 1: Institution Details ── */}
+                {/* ── Section 1: Institution & Department Details ── */}
                 <div className="space-y-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                   <div>
                     <label className="field-label">Official College Name <span className="text-rose-500">*</span></label>
                     <input
                       type="text"
+                      list="superadmin-existing-colleges-list"
                       value={newCollegeName}
                       onChange={e => setNewCollegeName(e.target.value)}
-                      placeholder="e.g. MIT - WPU University Pune"
+                      placeholder="e.g. MITWPU or Stanford University"
                       className="field-input"
                       required
                       autoFocus
                       autoComplete="off"
                     />
+                    <datalist id="superadmin-existing-colleges-list">
+                      {nonDummyColleges.map(c => (
+                        <option key={c.id} value={c.name} />
+                      ))}
+                    </datalist>
                     <p className="field-helper mt-1 text-[11px]">
-                      This is the official institution name. Unique identifier code &amp; keys are configured by the college admin.
+                      Enter institution name (e.g. MITWPU). Existing colleges will be automatically matched.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="field-label">Department Name <span className="text-rose-500">*</span></label>
+                    <input
+                      type="text"
+                      value={newDepartmentName}
+                      onChange={e => setNewDepartmentName(e.target.value)}
+                      placeholder="e.g. CS, Mechanical, Information Technology"
+                      className="field-input"
+                      required
+                      autoComplete="off"
+                    />
+                    <p className="field-helper mt-1 text-[11px]">
+                      The department this admin will manage (e.g. CS, Mechanical).
                     </p>
                   </div>
                 </div>
@@ -1513,7 +1474,7 @@ export default function SuperAdminDashboard() {
                       type="email"
                       value={newEmail}
                       onChange={e => setNewEmail(e.target.value)}
-                      placeholder="e.g. admin@mitwpu.edu.in or prof.sharma@gmail.com"
+                      placeholder="e.g. Kali@mitwpu or jain@mitwpu"
                       className="field-input font-mono text-xs"
                       required
                     />
@@ -1525,7 +1486,7 @@ export default function SuperAdminDashboard() {
                       type="text"
                       value={newAdminName}
                       onChange={e => setNewAdminName(e.target.value)}
-                      placeholder="e.g. Dr. Rajesh Sharma"
+                      placeholder="e.g. Hrishikesh Kali or Dr. Jain"
                       className="field-input"
                     />
                   </div>
@@ -1586,11 +1547,11 @@ export default function SuperAdminDashboard() {
                     </button>
                     <button
                       type="submit"
-                      disabled={isSavingAdmin || !newCollegeName.trim() || !newEmail.trim() || !newPassword.trim()}
+                      disabled={isSavingAdmin || !newCollegeName.trim() || !newDepartmentName.trim() || !newEmail.trim() || !newPassword.trim()}
                       className="btn btn-primary btn-sm gap-1.5 shadow-sm font-bold"
                     >
-                      {isSavingAdmin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                      <span>Create Admin &amp; College</span>
+                      {isSavingAdmin ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span>Create Admin Account</span>
                     </button>
                   </div>
                 </div>

@@ -169,12 +169,6 @@ export default function HomePage() {
             <UserCheck className="w-4 h-4 text-slate-700 dark:text-cyber-accent" />
             <span>Identity: <strong className="text-slate-900 dark:text-white font-bold">{userName}</strong></span>
           </span>
-          <button
-            onClick={handleChangeName}
-            className="text-indigo-600 dark:text-cyan-400 hover:underline text-[11px] font-semibold"
-          >
-            Change Nickname
-          </button>
         </div>
         <TimingGuardCard
           state={guardState}
@@ -195,12 +189,6 @@ export default function HomePage() {
             <ShieldCheck className="w-4 h-4 text-slate-700 dark:text-cyber-accent" />
             <span>Logged in as: <strong className="text-slate-900 dark:text-white font-bold">{userName}</strong></span>
           </span>
-          <button
-            onClick={handleChangeName}
-            className="text-indigo-600 dark:text-slate-400 hover:text-indigo-800 dark:hover:text-white text-[11px] font-semibold"
-          >
-            Switch identity
-          </button>
         </div>
         <QuizCard
           questionData={questionData}

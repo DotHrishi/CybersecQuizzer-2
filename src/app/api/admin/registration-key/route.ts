@@ -24,6 +24,9 @@ export async function GET(req: NextRequest) {
       }
 
       const college = department.college || (admin.collegeId ? await dataService.getCollegeById(admin.collegeId) : null);
+      const cleanKey = (department.registrationKey && !department.registrationKey.startsWith('PENDING_KEY_'))
+        ? department.registrationKey
+        : '';
 
       return NextResponse.json({
         success: true,
@@ -36,13 +39,13 @@ export async function GET(req: NextRequest) {
         department: {
           id: department.id,
           departmentName: department.departmentName,
-          registrationKey: department.registrationKey,
+          registrationKey: cleanKey,
           collegeId: department.collegeId,
         },
         departments: [{
           id: department.id,
           departmentName: department.departmentName,
-          registrationKey: department.registrationKey,
+          registrationKey: cleanKey,
           collegeId: department.collegeId,
         }],
       });
@@ -61,11 +64,14 @@ export async function GET(req: NextRequest) {
           name: college.name,
           identifier: college.identifier,
         } : null,
-        department: departments.length === 1 ? departments[0] : null,
+        department: departments.length === 1 ? {
+          ...departments[0],
+          registrationKey: (departments[0].registrationKey && !departments[0].registrationKey.startsWith('PENDING_KEY_')) ? departments[0].registrationKey : '',
+        } : null,
         departments: departments.map(d => ({
           id: d.id,
           departmentName: d.departmentName,
-          registrationKey: d.registrationKey,
+          registrationKey: (d.registrationKey && !d.registrationKey.startsWith('PENDING_KEY_')) ? d.registrationKey : '',
           collegeId: d.collegeId,
           studentCount: (d as any).studentCount || 0,
         })),
@@ -81,21 +87,45 @@ export async function GET(req: NextRequest) {
         success: true,
         isSuperAdmin: true,
         colleges: allColleges,
-        departments: allDepts,
+        departments: allDepts.map(d => ({
+          ...d,
+          registrationKey: (d.registrationKey && !d.registrationKey.startsWith('PENDING_KEY_')) ? d.registrationKey : '',
+        })),
       });
     }
 
-    return NextResponse.json(
-      { success: false, message: 'No college or department scope assigned to your admin account.' },
-      { status: 400 }
-    );
+    // 4. Default / Fallback Admin (e.g. Legacy admin or unassigned college admin)
+    const allColleges = await dataService.getAllColleges();
+    const fallbackCollege = allColleges[0] || null;
+    const fallbackDepts = fallbackCollege ? await dataService.getDepartmentsByCollege(fallbackCollege.id) : await dataService.getAllDepartments();
+
+    return NextResponse.json({
+      success: true,
+      isDepartmentAdmin: false,
+      college: fallbackCollege ? {
+        id: fallbackCollege.id,
+        name: fallbackCollege.name,
+        identifier: fallbackCollege.identifier,
+      } : null,
+      department: fallbackDepts.length === 1 ? {
+        ...fallbackDepts[0],
+        registrationKey: (fallbackDepts[0].registrationKey && !fallbackDepts[0].registrationKey.startsWith('PENDING_KEY_')) ? fallbackDepts[0].registrationKey : '',
+      } : null,
+      departments: fallbackDepts.map(d => ({
+        id: d.id,
+        departmentName: d.departmentName,
+        registrationKey: (d.registrationKey && !d.registrationKey.startsWith('PENDING_KEY_')) ? d.registrationKey : '',
+        collegeId: d.collegeId,
+        studentCount: (d as any).studentCount || 0,
+      })),
+    });
   } catch (err: any) {
     console.error('Error fetching admin registration keys:', err);
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
-// POST: Create a new department with registration key under the authenticated admin's college
+// POST: Create a new registration key under the authenticated admin's college
 export async function POST(req: NextRequest) {
   const auth = await verifyAdminRequest(req);
   if (!auth.isAuth || !auth.admin) {
@@ -109,7 +139,7 @@ export async function POST(req: NextRequest) {
     const { departmentName, registrationKey, collegeId } = body;
 
     if (!departmentName || typeof departmentName !== 'string' || departmentName.trim().length === 0) {
-      return NextResponse.json({ success: false, message: 'Department name is required.' }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'Department / stream name is required.' }, { status: 400 });
     }
 
     const keyValidation = validateRegistrationKeyFormat(registrationKey);
@@ -119,27 +149,30 @@ export async function POST(req: NextRequest) {
 
     const cleanKey = normalizeRegistrationKey(registrationKey);
 
-    // Determine target college with strict authorization
-    let targetCollegeId: number;
+    // Determine target college with fallback
+    let targetCollegeId: number | undefined = undefined;
     if (admin.isSuperAdmin) {
       targetCollegeId = Number(collegeId || admin.collegeId);
-      if (!targetCollegeId) {
-        return NextResponse.json({ success: false, message: 'College ID is required.' }, { status: 400 });
-      }
     } else if (admin.collegeId) {
       targetCollegeId = admin.collegeId;
-      if (collegeId && Number(collegeId) !== admin.collegeId) {
-        return NextResponse.json(
-          { success: false, message: 'Forbidden: You cannot create departments for another college.' },
-          { status: 403 }
-        );
+    } else if (admin.collegeDepartmentId) {
+      const dept = await dataService.getDepartmentById(admin.collegeDepartmentId);
+      if (dept) targetCollegeId = dept.collegeId;
+    } else if (collegeId) {
+      targetCollegeId = Number(collegeId);
+    }
+
+    if (!targetCollegeId) {
+      const colleges = await dataService.getAllColleges();
+      if (colleges.length > 0) {
+        targetCollegeId = colleges[0].id;
       }
-    } else if (admin.collegeDepartmentId && admin.college?.id) {
-      targetCollegeId = admin.college.id;
-    } else {
+    }
+
+    if (!targetCollegeId) {
       return NextResponse.json(
-        { success: false, message: 'Forbidden: You do not have permission to create departments.' },
-        { status: 403 }
+        { success: false, message: 'No college institution found to assign this registration key to.' },
+        { status: 400 }
       );
     }
 
@@ -160,13 +193,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Department "${created.departmentName}" with key "${created.registrationKey}" created successfully!`,
+      message: `Registration key "${created.registrationKey}" created successfully!`,
       department: created,
     });
   } catch (err: any) {
-    console.error('Error creating department registration key:', err);
+    console.error('Error creating registration key:', err);
     return NextResponse.json(
-      { success: false, message: err.message || 'Failed to create department registration key.' },
+      { success: false, message: err.message || 'Failed to create registration key.' },
       { status: 400 }
     );
   }

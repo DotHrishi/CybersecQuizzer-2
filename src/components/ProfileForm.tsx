@@ -197,12 +197,12 @@ export default function ProfileForm() {
   const validate = (): boolean => {
     const errs: typeof errors = {};
     const name = fullName.trim();
-    const nick = isNicknameSame ? name : nickname.trim();
+    const nick = (nickname || savedProfile?.nickname || '').trim();
     const mail = email.trim().toLowerCase();
     const regKey = registrationKey.trim();
 
     if (!name || name.length < 2)                         errs.fullName = 'Full name must be at least 2 characters.';
-    if (!nick || nick.length < 2)                         errs.nickname = 'Nickname must be at least 2 characters.';
+    if (!nick || nick.length < 2)                         errs.nickname = 'Valid nickname is required.';
     if (!mail || !mail.includes('@') || !mail.includes('.')) errs.email = 'Enter a valid email address.';
 
     if (gracePeriodInfo?.isBeyondGracePeriod) {
@@ -233,13 +233,11 @@ export default function ProfileForm() {
   /* ── Helpers ── */
   const handleFullNameChange = (v: string) => {
     setFullName(v);
-    if (isNicknameSame) setNickname(v);
     if (errors.fullName) setErrors(e => ({ ...e, fullName: undefined }));
   };
 
   const handleNicknameSameToggle = (checked: boolean) => {
     setIsNicknameSame(checked);
-    if (checked) setNickname(fullName);
   };
 
   const handleEmailTypeToggle = (usePersonal: boolean) => {
@@ -250,7 +248,7 @@ export default function ProfileForm() {
     if (savedProfile) {
       setFullName(savedProfile.fullName);
       setNickname(savedProfile.nickname);
-      setIsNicknameSame(savedProfile.isNicknameSame);
+      setIsNicknameSame(false);
       setEmail(savedProfile.email);
       setEmailType(savedProfile.emailType as 'college' | 'personal');
       setRegistrationKey('');
@@ -295,7 +293,7 @@ export default function ProfileForm() {
     if (!validate()) return;
 
     const cleanFullName = fullName.trim();
-    const cleanNickname = (isNicknameSame ? cleanFullName : nickname).trim();
+    const cleanNickname = (nickname || savedProfile?.nickname || '').trim();
     const cleanEmail    = email.trim().toLowerCase();
     const cleanRegKey   = registrationKey.trim();
 
@@ -304,7 +302,7 @@ export default function ProfileForm() {
       const payload: UserProfileFormValues = {
         fullName: cleanFullName,
         nickname: cleanNickname,
-        isNicknameSame,
+        isNicknameSame: false,
         email: cleanEmail,
         emailType,
         registrationKey: cleanRegKey || undefined,
@@ -529,12 +527,11 @@ export default function ProfileForm() {
               isCopied={copiedField === 'Full Name'}
             />
             <ProfileField
-              label="Display Nickname"
+              label="Account Nickname"
               value={savedProfile.nickname}
               icon={UserCheck}
-              note={savedProfile.isNicknameSame ? 'Same as full name' : undefined}
-              onCopy={() => handleCopy(savedProfile.nickname, 'Display Nickname')}
-              isCopied={copiedField === 'Display Nickname'}
+              onCopy={() => handleCopy(savedProfile.nickname, 'Account Nickname')}
+              isCopied={copiedField === 'Account Nickname'}
             />
             <ProfileField
               label="Email Address"
@@ -631,6 +628,23 @@ export default function ProfileForm() {
                   <User className="w-3.5 h-3.5" /> Identity
                 </h3>
 
+                {/* Account Nickname Tag (Read-Only) */}
+                <div>
+                  <label className="field-label">Account Nickname</label>
+                  <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="font-mono font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate">
+                        {nickname || savedProfile?.nickname || 'Account'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700 shrink-0">
+                      Account ID
+                    </span>
+                  </div>
+                  <p className="field-helper mt-1">Your unique quiz handle and leaderboard identifier.</p>
+                </div>
+
                 {/* Full Name */}
                 <div>
                   <label htmlFor="fullName" className="field-label">
@@ -654,55 +668,6 @@ export default function ProfileForm() {
                     <p id="fullName-err" role="alert" className="field-error">{errors.fullName}</p>
                   )}
                 </div>
-
-                {/* Nickname same toggle */}
-                <label className="flex items-center gap-3 p-3 rounded-lg card-sunken cursor-pointer select-none group">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={isNicknameSame}
-                      onChange={e => handleNicknameSameToggle(e.target.checked)}
-                      className="sr-only peer"
-                      id="same-toggle"
-                    />
-                    <div className={`toggle ${isNicknameSame ? 'bg-[#0f172a] dark:bg-white' : 'bg-slate-300 dark:bg-slate-600'}`}>
-                      <span className={`toggle-thumb ${isNicknameSame ? 'translate-x-4' : 'translate-x-0'}`} />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      Nickname same as Full Name
-                    </p>
-                    <p className="text-[11px] text-slate-400">Your display name on the leaderboard will match your full name</p>
-                  </div>
-                </label>
-
-                {/* Nickname */}
-                {!isNicknameSame && (
-                  <div>
-                    <label htmlFor="nickname" className="field-label">
-                      Display Nickname <span className="text-rose-500" aria-hidden="true">*</span>
-                    </label>
-                    <div className="relative">
-                      <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                      <input
-                        id="nickname"
-                        type="text"
-                        value={nickname}
-                        onChange={e => { setNickname(e.target.value); if (errors.nickname) setErrors(er => ({ ...er, nickname: undefined })); }}
-                        placeholder="e.g. CyberKing, Alex"
-                        maxLength={30}
-                        aria-invalid={!!errors.nickname}
-                        aria-describedby={errors.nickname ? 'nickname-err' : 'nickname-hint'}
-                        className={`field-input pl-9 ${errors.nickname ? 'field-input-error' : ''}`}
-                      />
-                    </div>
-                    {errors.nickname
-                      ? <p id="nickname-err" role="alert" className="field-error">{errors.nickname}</p>
-                      : <p id="nickname-hint" className="field-helper">Used on leaderboard &amp; quiz results. Max 30 chars.</p>
-                    }
-                  </div>
-                )}
               </div>
 
               <div className="section-divider" />

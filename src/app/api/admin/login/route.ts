@@ -75,7 +75,9 @@ export async function POST(req: NextRequest) {
           collegeDepartment: admin.collegeDepartment ? {
             id: admin.collegeDepartment.id,
             departmentName: admin.collegeDepartment.departmentName,
-            registrationKey: admin.collegeDepartment.registrationKey,
+            registrationKey: (admin.collegeDepartment.registrationKey && !admin.collegeDepartment.registrationKey.startsWith('PENDING_KEY_'))
+              ? admin.collegeDepartment.registrationKey
+              : '',
           } : null,
         },
         message: 'Admin authenticated successfully.',

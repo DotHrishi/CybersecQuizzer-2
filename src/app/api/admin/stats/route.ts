@@ -18,12 +18,20 @@ export async function GET(req: NextRequest) {
 
     const stats = await dataService.getStatsByScope(scope);
 
+    const rawDept = admin.collegeDepartment || null;
+    const sanitizedDept = rawDept ? {
+      ...rawDept,
+      registrationKey: (rawDept.registrationKey && !rawDept.registrationKey.startsWith('PENDING_KEY_'))
+        ? rawDept.registrationKey
+        : '',
+    } : null;
+
     return NextResponse.json({
       success: true,
       collegeId: admin.collegeId,
       collegeDepartmentId: admin.collegeDepartmentId,
       college: admin.college || admin.collegeDepartment?.college || null,
-      collegeDepartment: admin.collegeDepartment || null,
+      collegeDepartment: sanitizedDept,
       stats,
     });
   } catch (error: any) {

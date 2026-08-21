@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Lock, Plus, Edit2, Trash2, Download, Upload, AlertTriangle,
@@ -12,7 +12,7 @@ import {
   Trophy, Clock, Target, TrendingUp, Hash, ChevronsUpDown, Award,
   ShieldAlert, Layers, CalendarDays, Flame,
   AlertOctagon, CheckCircle, XCircle, TrendingDown,
-  Mail, LogOut, Key, User, Building2, Check, Copy, KeyRound, Edit3,
+  Mail, LogOut, Key, User, Building2, Check, Copy, KeyRound, Edit3, Filter, Sparkles,
 } from 'lucide-react';
 
 
@@ -30,13 +30,22 @@ interface Stats {
   totalAttempts: number; totalUsers: number; todayAttempts: number;
 }
 interface LeaderboardEntry {
-  rank: number; userName: string; attempts: number;
-  correctAnswers: number; totalPoints: number;
-  avgResponseTimeMs: number; lastAttemptDate: string;
+  rank: number;
+  userName: string;
+  fullName?: string;
+  collegeName?: string | null;
+  departmentName?: string | null;
+  registrationKey?: string | null;
+  collegeDepartmentId?: number | null;
+  attempts: number;
+  correctAnswers: number;
+  totalPoints: number;
+  avgResponseTimeMs: number;
+  lastAttemptDate: string;
 }
 
 type AdminTab = 'questions' | 'reports' | 'keys';
-type ReportTab = 'overview' | 'students' | 'attempts' | 'qbank' | 'risk' | 'category' | 'engagement' | 'trend';
+type ReportTab = 'overview' | 'departments' | 'students' | 'attempts' | 'qbank' | 'risk' | 'category' | 'engagement' | 'trend';
 type BulkAction = 'enable' | 'disable' | 'delete' | 'export';
 type BulkStep = 'select' | 'configure' | 'confirm' | 'processing' | 'result';
 type FilterDifficulty = 'All' | 'Easy' | 'Medium' | 'Hard';
@@ -672,7 +681,231 @@ function OverviewReport({ stats, questions, leaderboard }: { stats: Stats; quest
   );
 }
 
-/* ── 2. Student Performance report ── */
+/* ── 2. Department-Wise Breakdown report ── */
+function DepartmentsReport({
+  departments,
+  leaderboard,
+  onSelectDepartment,
+}: {
+  departments: any[];
+  leaderboard: LeaderboardEntry[];
+  onSelectDepartment?: (deptId: number) => void;
+}) {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopy = (key: string) => {
+    if (!key) return;
+    navigator.clipboard.writeText(key);
+    setCopiedKey(key);
+    toast.success(`Key "${key}" copied to clipboard!`);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  // Aggregate stats per department
+  const deptRows = departments.map(dept => {
+    const deptStudents = leaderboard.filter(u => u.collegeDepartmentId === dept.id || (u.departmentName && u.departmentName.toLowerCase() === dept.departmentName.toLowerCase()));
+    const studentCount = deptStudents.length;
+    const totalAttempts = deptStudents.reduce((s, u) => s + u.attempts, 0);
+    const totalCorrect = deptStudents.reduce((s, u) => s + u.correctAnswers, 0);
+    const totalPoints = deptStudents.reduce((s, u) => s + u.totalPoints, 0);
+    const avgScore = totalAttempts > 0 ? (totalPoints / totalAttempts).toFixed(2) : '0.00';
+    const accuracy = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0;
+    const sorted = [...deptStudents].sort((a, b) => b.totalPoints - a.totalPoints);
+    const topStudent = sorted.length > 0 ? sorted[0] : null;
+
+    return {
+      dept,
+      studentCount,
+      totalAttempts,
+      totalPoints,
+      avgScore,
+      accuracy,
+      topStudent,
+    };
+  });
+
+  const handleExportCSV = () => {
+    exportCSV(
+      'department_breakdown.csv',
+      deptRows.map(r => [
+        r.dept.departmentName,
+        r.dept.registrationKey,
+        String(r.studentCount),
+        String(r.totalAttempts),
+        r.avgScore,
+        `${r.accuracy}%`,
+        r.topStudent ? `${r.topStudent.userName} (${r.topStudent.totalPoints} pts)` : 'None',
+      ]),
+      ['Department', 'Registration Key', 'Enrolled Students', 'Total Attempts', 'Avg Score/Attempt', 'Accuracy %', 'Top Student']
+    );
+    toast.success('Department report exported.');
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            Department-Wise Performance &amp; Key Usage
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Monitor activity, quiz attempts, and student registration key usage per department.
+          </p>
+        </div>
+        <button onClick={handleExportCSV} className="btn btn-secondary btn-xs gap-1.5">
+          <FileText className="w-3 h-3" />
+          <span>Export CSV</span>
+        </button>
+      </div>
+
+      {/* Grid of Department Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {deptRows.map(r => {
+          const isCopied = copiedKey === r.dept.registrationKey;
+          return (
+            <div
+              key={r.dept.id}
+              className="card p-5 space-y-4 hover:border-blue-300 dark:hover:border-blue-700 transition-all shadow-xs flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Department</span>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white mt-0.5">{r.dept.departmentName}</h3>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 shrink-0">
+                    Active Key
+                  </span>
+                </div>
+
+                {/* Key Display Block */}
+                <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <KeyRound className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span className="font-mono text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                      {r.dept.registrationKey}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(r.dept.registrationKey)}
+                    className="btn btn-secondary btn-xs gap-1 py-1 px-2 text-[11px] shrink-0"
+                    title="Copy Key"
+                  >
+                    {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+
+                {/* Stats Matrix */}
+                <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/30">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase">Students</div>
+                    <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">{r.studentCount}</div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/30">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase">Attempts</div>
+                    <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">{r.totalAttempts}</div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/30">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase">Accuracy</div>
+                    <div className={`text-base font-black mt-0.5 ${r.accuracy >= 65 ? 'text-emerald-600 dark:text-emerald-400' : r.accuracy >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500'}`}>
+                      {r.accuracy}%
+                    </div>
+                  </div>
+                </div>
+
+                {r.topStudent && (
+                  <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                    <span>Top Rank:</span>
+                    <strong className="text-slate-800 dark:text-slate-200">
+                      {r.topStudent.userName} ({r.topStudent.totalPoints.toFixed(1)} pts)
+                    </strong>
+                  </div>
+                )}
+              </div>
+
+              {onSelectDepartment && (
+                <button
+                  type="button"
+                  onClick={() => onSelectDepartment(r.dept.id)}
+                  className="btn btn-secondary btn-sm w-full justify-center gap-1.5 mt-2 font-semibold text-xs"
+                >
+                  <Filter className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>View Department Students &amp; Reports</span>
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Comparison Table */}
+      <div className="card overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+          <span className="text-xs font-bold text-slate-900 dark:text-white">
+            All Departments Performance Matrix ({deptRows.length})
+          </span>
+        </div>
+        <div className="table-wrapper">
+          <table className="table-base">
+            <thead className="table-head">
+              <tr>
+                <th className="table-th">Department</th>
+                <th className="table-th text-center">Registration Key</th>
+                <th className="table-th text-center">Enrolled Students</th>
+                <th className="table-th text-center">Total Attempts</th>
+                <th className="table-th text-center">Avg Score / Attempt</th>
+                <th className="table-th text-center">Accuracy %</th>
+                <th className="table-th text-right">Top Performer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deptRows.map(r => (
+                <tr key={r.dept.id} className="table-row">
+                  <td className="table-td font-bold text-slate-900 dark:text-white">
+                    {r.dept.departmentName}
+                  </td>
+                  <td className="table-td text-center">
+                    <span className="font-mono text-xs font-extrabold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80">
+                      {r.dept.registrationKey}
+                    </span>
+                  </td>
+                  <td className="table-td text-center font-semibold text-slate-800 dark:text-slate-200">
+                    {r.studentCount}
+                  </td>
+                  <td className="table-td text-center text-slate-600 dark:text-slate-400">
+                    {r.totalAttempts}
+                  </td>
+                  <td className="table-td text-center font-semibold text-slate-900 dark:text-white">
+                    {r.avgScore} pts
+                  </td>
+                  <td className="table-td text-center">
+                    <span className={`text-xs font-bold ${r.accuracy >= 65 ? 'text-emerald-600 dark:text-emerald-400' : r.accuracy >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500'}`}>
+                      {r.accuracy}%
+                    </span>
+                  </td>
+                  <td className="table-td text-right text-xs">
+                    {r.topStudent ? (
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {r.topStudent.userName} <span className="text-slate-400 font-normal">({r.topStudent.totalPoints.toFixed(1)} pts)</span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">No attempts yet</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 3. Student Performance report ── */
 function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEntry[]; adminToken?: string | null }) {
   const [search, setSearch]   = useState('');
   const [sortKey, setSortKey] = useState<string>('totalPoints');
@@ -693,14 +926,28 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
   const getVal = (u: LeaderboardEntry, k: string): number => {
     if (k === 'accuracy')  return u.attempts ? (u.correctAnswers / u.attempts) : 0;
     if (k === 'lastDate')  return new Date(u.lastAttemptDate).getTime();
+    if (k === 'department') return (u.departmentName || '').localeCompare('');
     return (u[k as keyof LeaderboardEntry] as number) ?? 0;
   };
 
   const filtered = leaderboard
-    .filter(u => !search || u.userName.toLowerCase().includes(search.toLowerCase()))
+    .filter(u => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return (
+        u.userName.toLowerCase().includes(s) ||
+        (u.fullName && u.fullName.toLowerCase().includes(s)) ||
+        (u.departmentName && u.departmentName.toLowerCase().includes(s)) ||
+        (u.registrationKey && u.registrationKey.toLowerCase().includes(s))
+      );
+    })
     .sort((a, b) => {
       if (sortKey === 'userName') {
         const cmp = a.userName.localeCompare(b.userName);
+        return sortDir === 'asc' ? cmp : -cmp;
+      }
+      if (sortKey === 'departmentName') {
+        const cmp = (a.departmentName || '').localeCompare(b.departmentName || '');
         return sortDir === 'asc' ? cmp : -cmp;
       }
       const av = getVal(a, sortKey), bv = getVal(b, sortKey);
@@ -711,6 +958,9 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
     exportCSV('students_report.csv',
       filtered.map(u => [
         u.userName,
+        u.fullName || u.userName,
+        u.departmentName || 'General',
+        u.registrationKey || 'N/A',
         String(u.attempts),
         String(u.correctAnswers),
         `${u.attempts ? Math.round((u.correctAnswers / u.attempts) * 100) : 0}%`,
@@ -719,14 +969,14 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
         (u.avgResponseTimeMs / 1000).toFixed(2),
         new Date(u.lastAttemptDate).toISOString().split('T')[0],
       ]),
-      ['Student', 'Attempts', 'Correct', 'Accuracy', 'Total Points', 'Rank', 'Avg Speed (s)', 'Last Attempt']
+      ['Student Nickname', 'Full Name', 'Department', 'Registration Key Used', 'Attempts', 'Correct', 'Accuracy', 'Total Points', 'Rank', 'Avg Speed (s)', 'Last Attempt']
     );
     toast.success('Student report exported.');
   };
 
   const handleExportPDF = () => {
-    const rows = filtered.map(u => `<tr><td>${u.userName}</td><td>${u.attempts}</td><td>${u.correctAnswers}</td><td>${u.totalPoints.toFixed(2)} pts</td><td>#${u.rank}</td><td>${(u.avgResponseTimeMs/1000).toFixed(2)}s</td><td>${new Date(u.lastAttemptDate).toLocaleDateString()}</td></tr>`).join('');
-    exportPDF('Student Performance Report', `<h1>Student Performance Report</h1><p class="sub">Generated: ${new Date().toLocaleString()}</p><table><thead><tr><th>Student</th><th>Attempts</th><th>Correct</th><th>Total Points</th><th>Rank</th><th>Avg Speed</th><th>Last Attempt</th></tr></thead><tbody>${rows}</tbody></table>`);
+    const rows = filtered.map(u => `<tr><td>${u.userName}</td><td>${u.departmentName || 'General'} (Key: ${u.registrationKey || 'N/A'})</td><td>${u.attempts}</td><td>${u.correctAnswers}</td><td>${u.totalPoints.toFixed(2)} pts</td><td>#${u.rank}</td><td>${(u.avgResponseTimeMs/1000).toFixed(2)}s</td><td>${new Date(u.lastAttemptDate).toLocaleDateString()}</td></tr>`).join('');
+    exportPDF('Student Performance Report', `<h1>Student Performance Report</h1><p class="sub">Generated: ${new Date().toLocaleString()}</p><table><thead><tr><th>Student</th><th>Department & Key</th><th>Attempts</th><th>Correct</th><th>Total Points</th><th>Rank</th><th>Avg Speed</th><th>Last Attempt</th></tr></thead><tbody>${rows}</tbody></table>`);
   };
 
   const handleResetStudentPassword = async (e: React.FormEvent) => {
@@ -776,7 +1026,7 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">Student Performance</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Per-student attempts, scores, rank, speed, and credential management.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Per-student attempts, scores, department association, registration key used, and credentials.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleExportCSV} className="btn btn-secondary btn-xs gap-1.5"><FileText className="w-3 h-3" />CSV</button>
@@ -785,7 +1035,7 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
       </div>
       <div className="search-wrap">
         <Search className="search-icon" />
-        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search student..." className="search-input" />
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by student name, department, or registration key..." className="search-input" />
         {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 btn-icon w-5 h-5"><X className="w-3.5 h-3.5" /></button>}
       </div>
       <div className="card overflow-hidden">
@@ -794,6 +1044,7 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
             <thead className="table-head">
               <tr>
                 {th('Student', 'userName')}
+                {th('Department & Key', 'departmentName')}
                 {th('Attempts', 'attempts', 'text-center')}
                 {th('Correct', 'correctAnswers', 'text-center')}
                 {th('Accuracy', 'accuracy', 'text-center')}
@@ -807,7 +1058,7 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={10}><div className="empty-state py-10"><div className="empty-state-icon"><Users className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No students found</p></div></td></tr>
+                ? <tr><td colSpan={11}><div className="empty-state py-10"><div className="empty-state-icon"><Users className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No students found</p></div></td></tr>
                 : filtered.map(u => {
                   const accuracy = u.attempts ? Math.round((u.correctAnswers / u.attempts) * 100) : 0;
                   return (
@@ -817,7 +1068,27 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
                           <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-extrabold text-slate-600 dark:text-slate-300 shrink-0">
                             {u.userName.substring(0,2).toUpperCase()}
                           </div>
-                          {u.userName}
+                          <div>
+                            <div className="font-bold text-slate-900 dark:text-white">{u.userName}</div>
+                            {u.fullName && u.fullName !== u.userName && (
+                              <div className="text-[11px] text-slate-400 font-normal">{u.fullName}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="table-td">
+                        <div className="space-y-0.5">
+                          <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {u.departmentName || 'General'}
+                          </div>
+                          {u.registrationKey ? (
+                            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/80 px-1.5 py-0.2 rounded border border-blue-200/60 dark:border-blue-800/60">
+                              <KeyRound className="w-2.5 h-2.5" />
+                              Key: {u.registrationKey}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">Direct Registration</span>
+                          )}
                         </div>
                       </td>
                       <td className="table-td text-center text-slate-500">{u.attempts}</td>
@@ -868,7 +1139,7 @@ function StudentReport({ leaderboard, adminToken }: { leaderboard: LeaderboardEn
   );
 }
 
-/* ── 3. Quiz Attempts / Activity report ── */
+/* ── 4. Quiz Attempts / Activity report ── */
 function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
   const [search, setSearch]       = useState('');
   const [dateFilter, setDateFilter] = useState<'all'|'today'|'week'|'month'>('all');
@@ -898,7 +1169,15 @@ function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
   const monthAgo  = new Date(Date.now() - 30*24*3600*1000).toISOString().slice(0, 10);
 
   const filtered = leaderboard
-    .filter(u => !search || u.userName.toLowerCase().includes(search.toLowerCase()))
+    .filter(u => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return (
+        u.userName.toLowerCase().includes(s) ||
+        (u.departmentName && u.departmentName.toLowerCase().includes(s)) ||
+        (u.registrationKey && u.registrationKey.toLowerCase().includes(s))
+      );
+    })
     .filter(u => {
       if (dateFilter === 'all') return true;
       const d = u.lastAttemptDate.slice(0, 10);
@@ -912,14 +1191,27 @@ function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
         const cmp = a.userName.localeCompare(b.userName);
         return sortDir === 'asc' ? cmp : -cmp;
       }
+      if (sortKey === 'departmentName') {
+        const cmp = (a.departmentName || '').localeCompare(b.departmentName || '');
+        return sortDir === 'asc' ? cmp : -cmp;
+      }
       const av = getVal(a, sortKey), bv = getVal(b, sortKey);
       return sortDir === 'asc' ? av - bv : bv - av;
     });
 
   const handleExportCSV = () => {
     exportCSV('quiz_attempts.csv',
-      filtered.map(u => [u.userName, String(u.attempts), String(u.correctAnswers), u.totalPoints.toFixed(2), (u.avgResponseTimeMs/1000).toFixed(2)+'s', new Date(u.lastAttemptDate).toLocaleString()]),
-      ['Student','Total Attempts','Correct','Total Points','Avg Speed','Last Attempt']
+      filtered.map(u => [
+        u.userName,
+        u.departmentName || 'General',
+        u.registrationKey || 'N/A',
+        String(u.attempts),
+        String(u.correctAnswers),
+        u.totalPoints.toFixed(2),
+        (u.avgResponseTimeMs/1000).toFixed(2)+'s',
+        new Date(u.lastAttemptDate).toLocaleString()
+      ]),
+      ['Student', 'Department', 'Registration Key', 'Total Attempts', 'Correct', 'Total Points', 'Avg Speed', 'Last Attempt']
     );
     toast.success('Attempts report exported.');
   };
@@ -927,9 +1219,9 @@ function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
   const handleExportPDF = () => {
     const rows = filtered.map(u => {
       const status = u.correctAnswers > 0 ? 'Completed' : 'Attempted';
-      return `<tr><td>${u.userName}</td><td>${u.attempts}</td><td>${u.correctAnswers}</td><td>${u.totalPoints.toFixed(2)} pts</td><td>${(u.avgResponseTimeMs/1000).toFixed(2)}s</td><td style="color:${status==='Completed'?'#16a34a':'#64748b'}">${status}</td></tr>`;
+      return `<tr><td>${u.userName}</td><td>${u.departmentName || 'General'} (Key: ${u.registrationKey || 'N/A'})</td><td>${u.attempts}</td><td>${u.correctAnswers}</td><td>${u.totalPoints.toFixed(2)} pts</td><td>${(u.avgResponseTimeMs/1000).toFixed(2)}s</td><td style="color:${status==='Completed'?'#16a34a':'#64748b'}">${status}</td></tr>`;
     }).join('');
-    exportPDF('Quiz Attempts Report', `<h1>Quiz Attempt / Activity Report</h1><p class="sub">Generated: ${new Date().toLocaleString()}</p><table><thead><tr><th>Student</th><th>Attempts</th><th>Correct</th><th>Points</th><th>Avg Speed</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`);
+    exportPDF('Quiz Attempts Report', `<h1>Quiz Attempt / Activity Report</h1><p class="sub">Generated: ${new Date().toLocaleString()}</p><table><thead><tr><th>Student</th><th>Department & Key</th><th>Attempts</th><th>Correct</th><th>Points</th><th>Avg Speed</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`);
   };
 
   const statusBadge = (u: LeaderboardEntry) => {
@@ -945,7 +1237,7 @@ function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">Quiz Attempt Activity</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Per-student attempt counts, scores, and status.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Per-student attempt counts, department association, registration key used, scores, and status.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleExportCSV} className="btn btn-secondary btn-xs gap-1.5"><FileText className="w-3 h-3" />CSV</button>
@@ -957,7 +1249,7 @@ function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="search-wrap flex-1 min-w-[160px]">
           <Search className="search-icon" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search student..." className="search-input" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by student, department, or key..." className="search-input" />
           {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 btn-icon w-5 h-5"><X className="w-3.5 h-3.5" /></button>}
         </div>
         {(['all','today','week','month'] as const).map(f => (
@@ -973,6 +1265,7 @@ function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
             <thead className="table-head">
               <tr>
                 {th('Student',      'userName')}
+                {th('Department & Key', 'departmentName')}
                 {th('Attempts',     'attempts',     'text-center')}
                 {th('Correct',      'correctAnswers','text-center')}
                 {th('Points',       'totalPoints',   'text-center')}
@@ -983,7 +1276,7 @@ function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={7}><div className="empty-state py-10"><div className="empty-state-icon"><Activity className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No attempts match filters</p></div></td></tr>
+                ? <tr><td colSpan={8}><div className="empty-state py-10"><div className="empty-state-icon"><Activity className="w-5 h-5" /></div><p className="text-sm font-bold text-slate-900 dark:text-white">No attempts match filters</p></div></td></tr>
                 : filtered.map(u => (
                   <tr key={u.userName} className="table-row">
                     <td className="table-td font-semibold text-slate-900 dark:text-white">
@@ -992,6 +1285,21 @@ function AttemptsReport({ leaderboard }: { leaderboard: LeaderboardEntry[] }) {
                           {u.userName.substring(0,2).toUpperCase()}
                         </div>
                         {u.userName}
+                      </div>
+                    </td>
+                    <td className="table-td">
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {u.departmentName || 'General'}
+                        </div>
+                        {u.registrationKey ? (
+                          <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/80 px-1.5 py-0.2 rounded border border-blue-200/60 dark:border-blue-800/60">
+                            <KeyRound className="w-2.5 h-2.5" />
+                            Key: {u.registrationKey}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">Direct</span>
+                        )}
                       </div>
                     </td>
                     <td className="table-td text-center text-slate-500">{u.attempts}</td>
@@ -1191,7 +1499,15 @@ function RiskReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; s
 
   const filtered = enriched
     .filter(u => filterRisk === 'All' || u.risk === filterRisk)
-    .filter(u => !search || u.userName.toLowerCase().includes(search.toLowerCase()))
+    .filter(u => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return (
+        u.userName.toLowerCase().includes(s) ||
+        (u.departmentName && u.departmentName.toLowerCase().includes(s)) ||
+        (u.registrationKey && u.registrationKey.toLowerCase().includes(s))
+      );
+    })
     .sort((a, b) => {
       const order: Record<RiskLevel, number> = { High: 0, Medium: 1, Low: 2 };
       return order[a.risk as RiskLevel] - order[b.risk as RiskLevel];
@@ -1216,8 +1532,8 @@ function RiskReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; s
 
   const handleExportCSV = () => {
     exportCSV('student_risk_report.csv',
-      filtered.map(u => [u.userName, String(u.attempts), `${u.accuracy}%`, u.totalPoints.toFixed(2), new Date(u.lastAttemptDate).toLocaleDateString(), u.risk, u.action]),
-      ['Student', 'Attempts', 'Accuracy', 'Score', 'Last Attempt', 'Risk', 'Action']
+      filtered.map(u => [u.userName, u.departmentName || 'General', u.registrationKey || 'N/A', String(u.attempts), `${u.accuracy}%`, u.totalPoints.toFixed(2), new Date(u.lastAttemptDate).toLocaleDateString(), u.risk, u.action]),
+      ['Student', 'Department', 'Registration Key', 'Attempts', 'Accuracy', 'Score', 'Last Attempt', 'Risk', 'Action']
     );
     toast.success('Risk report exported.');
   };
@@ -1256,7 +1572,7 @@ function RiskReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; s
       <div className="flex flex-wrap items-center gap-2">
         <div className="search-wrap flex-1 min-w-[160px]">
           <Search className="search-icon" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search student..." className="search-input" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by student, department, or key..." className="search-input" />
           {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 btn-icon w-5 h-5"><X className="w-3.5 h-3.5" /></button>}
         </div>
         {(['All', 'High', 'Medium', 'Low'] as const).map(r => (
@@ -1284,11 +1600,21 @@ function RiskReport({ leaderboard, stats }: { leaderboard: LeaderboardEntry[]; s
                 : filtered.map(u => (
                   <tr key={u.userName} className="table-row">
                     <td className="table-td font-semibold text-slate-900 dark:text-white">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-extrabold text-slate-600 dark:text-slate-300 shrink-0">
                           {u.userName.substring(0, 2).toUpperCase()}
                         </div>
-                        {u.userName}
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-white">{u.userName}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[11px] text-slate-400 font-normal">{u.departmentName || 'General'}</span>
+                            {u.registrationKey && (
+                              <span className="font-mono text-[9px] font-bold px-1 py-0.2 rounded bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200/60">
+                                {u.registrationKey}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="table-td text-center text-slate-500">{u.attempts}</td>
@@ -1771,11 +2097,14 @@ export default function AdminDashboard() {
   const [adminDepartmentsList, setAdminDepartmentsList] = useState<any[]>([]);
   const [copiedKeyId, setCopiedKeyId]         = useState<number | string | null>(null);
 
-  /* New department creation modal */
-  const [isNewDeptModalOpen, setIsNewDeptModalOpen] = useState(false);
-  const [newDeptName, setNewDeptName]         = useState('');
-  const [newDeptKey, setNewDeptKey]           = useState('');
-  const [isCreatingDept, setIsCreatingDept]   = useState(false);
+  /* Password change state */
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordUpdating, setPasswordUpdating] = useState(false);
 
   /* Tab state */
   const [adminTab, setAdminTab]               = useState<AdminTab>('questions');
@@ -1867,6 +2196,8 @@ export default function AdminDashboard() {
       }
 
       const [qData, sData, lData] = await Promise.all([qRes.json(), sRes.json(), lRes.json()]);
+      let resolvedDept: any = null;
+
       if (qData.success && sData.success) {
         setQuestions(qData.questions || []);
         setStats(sData.stats);
@@ -1877,6 +2208,7 @@ export default function AdminDashboard() {
         if (sData.collegeDepartment) {
           setAdminDepartment(sData.collegeDepartment);
           sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(sData.collegeDepartment));
+          resolvedDept = sData.collegeDepartment;
         }
         setLeaderboard(lData.leaderboard || []);
         setIsAuthenticated(true);
@@ -1890,6 +2222,7 @@ export default function AdminDashboard() {
           if (regData.department) {
             setAdminDepartment(regData.department);
             sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(regData.department));
+            resolvedDept = regData.department;
           }
           if (regData.departments) {
             setAdminDepartmentsList(regData.departments);
@@ -1899,6 +2232,13 @@ export default function AdminDashboard() {
             sessionStorage.setItem(ADMIN_COLLEGE_STORAGE_KEY, JSON.stringify(regData.college));
           }
         }
+      }
+
+      // Auto-prompt on login if assigned department has no registration key yet
+      if (resolvedDept && (!resolvedDept.registrationKey || resolvedDept.registrationKey.trim() === '')) {
+        setTargetDeptForEdit(resolvedDept);
+        setNewKeyInput('');
+        setKeyModalOpen(true);
       }
     } catch {
       toast.error('Network error.');
@@ -1931,6 +2271,11 @@ export default function AdminDashboard() {
         if (data.admin?.collegeDepartment) {
           sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(data.admin.collegeDepartment));
           setAdminDepartment(data.admin.collegeDepartment);
+          if (!data.admin.collegeDepartment.registrationKey || data.admin.collegeDepartment.registrationKey.trim() === '') {
+            setTargetDeptForEdit(data.admin.collegeDepartment);
+            setNewKeyInput('');
+            setKeyModalOpen(true);
+          }
         }
         setAdminToken(data.token);
         setIsAuthenticated(true);
@@ -2020,20 +2365,24 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleCreateDepartment = async (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDeptName.trim()) {
-      toast.error('Department name is required.');
+    if (!currentPasswordInput) {
+      toast.error('Please enter your current password.');
       return;
     }
-    if (!newDeptKey.trim()) {
-      toast.error('Registration key is required.');
+    if (!newPasswordInput || newPasswordInput.trim().length < 6) {
+      toast.error('New password must be at least 6 characters.');
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      toast.error('New passwords do not match.');
       return;
     }
 
-    setIsCreatingDept(true);
+    setPasswordUpdating(true);
     try {
-      const res = await fetch('/api/admin/registration-key', {
+      const res = await fetch('/api/admin/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2041,32 +2390,27 @@ export default function AdminDashboard() {
           'x-admin-password': adminToken || '',
         },
         body: JSON.stringify({
-          departmentName: newDeptName.trim(),
-          registrationKey: newDeptKey.trim(),
+          currentPassword: currentPasswordInput,
+          newPassword: newPasswordInput.trim(),
         }),
       });
 
       const data = await res.json();
-      if (data.success && data.department) {
-        toast.success(data.message || 'Department and key created successfully!');
-        setAdminDepartmentsList(prev => [...prev, data.department]);
-        if (!adminDepartment) {
-          setAdminDepartment(data.department);
-          sessionStorage.setItem(ADMIN_DEPT_STORAGE_KEY, JSON.stringify(data.department));
-        }
-        setIsNewDeptModalOpen(false);
-        setNewDeptName('');
-        setNewDeptKey('');
+      if (data.success) {
+        toast.success(data.message || 'Password changed successfully!');
+        setPasswordModalOpen(false);
+        setCurrentPasswordInput('');
+        setNewPasswordInput('');
+        setConfirmPasswordInput('');
       } else {
-        toast.error(data.message || 'Failed to create department.');
+        toast.error(data.message || 'Failed to change password.');
       }
     } catch {
-      toast.error('Network error creating department.');
+      toast.error('Network error changing password.');
     } finally {
-      setIsCreatingDept(false);
+      setPasswordUpdating(false);
     }
   };
-
 
   if (!isAuthenticated) return <LoginScreen onLogin={handleLogin} isLoading={isLoading} />;
 
@@ -2320,6 +2664,19 @@ export default function AdminDashboard() {
               <button onClick={() => adminToken && fetchAdminData(adminToken)} className="btn btn-secondary btn-sm gap-1.5"><RefreshCw className="w-3.5 h-3.5" />Refresh</button>
             )}
             <button
+              onClick={() => {
+                setCurrentPasswordInput('');
+                setNewPasswordInput('');
+                setConfirmPasswordInput('');
+                setPasswordModalOpen(true);
+              }}
+              title="Change your login password"
+              className="btn btn-secondary btn-sm gap-1.5 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400"
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Change Password</span>
+            </button>
+            <button
               onClick={handleLogout}
               title="Log out of Admin Panel"
               className="btn btn-secondary btn-sm gap-1.5 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
@@ -2331,51 +2688,88 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Registration Key Banner (for Department Admins) */}
-      {adminDepartment && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-slate-800/80 dark:to-slate-800/40 border border-blue-200/80 dark:border-slate-700 shadow-2xs">
+      {/* Registration Key Banner (for Department Admins - shown when not on keys tab) */}
+      {adminDepartment && adminTab !== 'keys' && (
+        <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border shadow-2xs ${
+          !adminDepartment.registrationKey
+            ? 'bg-gradient-to-r from-amber-50/90 to-orange-50/60 dark:from-amber-950/40 dark:to-slate-800/60 border-amber-300 dark:border-amber-900/60'
+            : 'bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-slate-800/80 dark:to-slate-800/40 border-blue-200/80 dark:border-slate-700'
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/80 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              !adminDepartment.registrationKey
+                ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
+                : 'bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400'
+            }`}>
               <KeyRound className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Department Registration Key</span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">Active</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                  !adminDepartment.registrationKey
+                    ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200'
+                    : 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300'
+                }`}>
+                  {!adminDepartment.registrationKey ? 'Pending Setup' : 'Active'}
+                </span>
               </div>
-              <p className="text-base font-mono font-extrabold text-slate-900 dark:text-white mt-0.5 tracking-wider">
-                {adminDepartment.registrationKey}
-              </p>
+              {adminDepartment.registrationKey ? (
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                  Registration key configured &amp; active for student enrolments.
+                </p>
+              ) : (
+                <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 mt-0.5">
+                  No registration key set yet. Create a key to enable student enrolments for {adminDepartment.departmentName}.
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(adminDepartment.registrationKey);
-                toast.success('Registration key copied to clipboard!');
-              }}
-              className="btn btn-secondary btn-xs gap-1.5 flex-1 sm:flex-initial"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              <span>Copy Key</span>
-            </button>
-            <button
-              onClick={() => {
-                setNewKeyInput(adminDepartment.registrationKey);
-                setKeyModalOpen(true);
-              }}
-              className="btn btn-primary btn-xs gap-1.5 flex-1 sm:flex-initial"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Change Key</span>
-            </button>
+            {adminDepartment.registrationKey ? (
+              <>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(adminDepartment.registrationKey);
+                    toast.success('Registration key copied to clipboard!');
+                  }}
+                  className="btn btn-secondary btn-xs gap-1.5 flex-1 sm:flex-initial"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy Key</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setTargetDeptForEdit(adminDepartment);
+                    setNewKeyInput(adminDepartment.registrationKey);
+                    setKeyModalOpen(true);
+                  }}
+                  className="btn btn-primary btn-xs gap-1.5 flex-1 sm:flex-initial"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Change Key</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setTargetDeptForEdit(adminDepartment);
+                  setNewKeyInput('');
+                  setKeyModalOpen(true);
+                }}
+                className="btn btn-primary btn-sm gap-1.5 shadow-sm font-bold w-full sm:w-auto"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Create Registration Key</span>
+              </button>
+            )}
           </div>
         </div>
       )}
 
 
-      {/* KPI strip — always visible */}
-      {stats && (
+      {/* KPI strip — hidden on registration key tab */}
+      {stats && adminTab !== 'keys' && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: 'Total',    value: stats.totalQuestions,  icon: BookOpen,    sub: 'questions', accent: '' },
@@ -2424,17 +2818,12 @@ export default function AdminDashboard() {
           }`}
         >
           <KeyRound className="w-3.5 h-3.5" />
-          <span>Registration Keys</span>
-          {adminDepartmentsList.length > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-              {adminDepartmentsList.length}
-            </span>
-          )}
+          <span>Registration Key</span>
         </button>
       </div>
 
       {/* ════════════════════════════════
-          REGISTRATION KEYS TAB
+          REGISTRATION KEY TAB
       ════════════════════════════════ */}
       {adminTab === 'keys' && (
         <div className="space-y-6">
@@ -2446,137 +2835,87 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                  Registration Key Management
+                  Department Registration Key
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Share these registration keys with students to automatically associate them with your college &amp; department.
+                  Share this key with students in {adminDepartment?.departmentName || 'your department'} to enroll them into your college &amp; stream.
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setIsNewDeptModalOpen(true)}
-              className="btn btn-primary btn-sm gap-1.5 shrink-0 shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Add Department &amp; Key</span>
-            </button>
           </div>
 
-          {/* Department Cards or List */}
-          {adminDepartmentsList.length > 0 ? (
-            <div className="card overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Authorized College Departments ({adminDepartmentsList.length})
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    College: <strong className="text-slate-700 dark:text-slate-300">{adminCollege?.name || 'Assigned Institution'}</strong>
-                  </p>
-                </div>
-              </div>
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {adminDepartmentsList.map((dept: any) => {
-                  const isCopied = copiedKeyId === dept.id;
-                  return (
-                    <div key={dept.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-slate-900 dark:text-white">
-                            {dept.departmentName}
-                          </span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-                            Active
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {adminCollege?.name} · {dept.studentCount ? `${dept.studentCount} enrolled students` : 'Ready for student registration'}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl font-mono text-sm font-extrabold text-slate-900 dark:text-white">
-                          <KeyRound className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          <span>{dept.registrationKey}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyKey(dept.registrationKey, dept.id)}
-                          className="btn btn-secondary btn-sm gap-1 text-xs"
-                          title="Copy registration key"
-                        >
-                          {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{isCopied ? 'Copied!' : 'Copy'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openEditKeyModal(dept)}
-                          className="btn btn-primary btn-sm gap-1 text-xs"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>Change Key</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : adminDepartment ? (
-            /* Single Assigned Department View */
+          {/* Department Key Card */}
+          {adminDepartment ? (
             <div className="card p-6 space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Department</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Department</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                      adminDepartment.registrationKey
+                        ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300'
+                        : 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200'
+                    }`}>
+                      {adminDepartment.registrationKey ? 'Active' : 'Pending Setup'}
+                    </span>
+                  </div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
                     {adminDepartment.departmentName}
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Institution: <strong className="text-slate-700 dark:text-slate-300">{adminCollege?.name}</strong>
+                    Institution: <strong className="text-slate-700 dark:text-slate-300">{adminCollege?.name || 'Your Assigned College'}</strong>
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 font-mono text-base font-extrabold text-blue-700 dark:text-blue-300">
-                    {adminDepartment.registrationKey}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyKey(adminDepartment.registrationKey, adminDepartment.id)}
-                    className="btn btn-secondary btn-sm gap-1.5"
-                  >
-                    {copiedKeyId === adminDepartment.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedKeyId === adminDepartment.id ? 'Copied!' : 'Copy Key'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openEditKeyModal(adminDepartment)}
-                    className="btn btn-primary btn-sm gap-1.5"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Change Registration Key</span>
-                  </button>
+                  {adminDepartment.registrationKey ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyKey(adminDepartment.registrationKey, adminDepartment.id)}
+                        className="btn btn-secondary btn-sm gap-1.5"
+                      >
+                        {copiedKeyId === adminDepartment.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedKeyId === adminDepartment.id ? 'Copied!' : 'Copy Key'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEditKeyModal(adminDepartment)}
+                        className="btn btn-primary btn-sm gap-1.5"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Change Registration Key</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openEditKeyModal(adminDepartment)}
+                      className="btn btn-primary btn-sm gap-1.5 shadow-sm font-bold"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Create Registration Key</span>
+                    </button>
+                  )}
                 </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">How Students Use This Key:</p>
+                <ol className="text-xs text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside">
+                  <li>Direct students to the quiz application URL.</li>
+                  <li>When creating or updating their profile, they enter this exact registration key.</li>
+                  <li>Their account will automatically be mapped to <strong>{adminCollege?.name} - {adminDepartment.departmentName}</strong> and their results will reflect in your analytics.</li>
+                </ol>
               </div>
             </div>
           ) : (
-            /* No Department Key Found View */
-            <div className="card p-8 text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <div className="card p-8 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
                 <KeyRound className="w-6 h-6" />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">No Registration Key Configured Yet</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
-                  Create a department and registration key for <strong className="text-slate-700 dark:text-slate-300">{adminCollege?.name || 'your college'}</strong> so students can tag their accounts.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsNewDeptModalOpen(true)}
-                className="btn btn-primary btn-md gap-2 mx-auto"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Create Registration Key</span>
-              </button>
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No Assigned Department Found</p>
+              <p className="text-xs text-slate-400">Please contact the System Admin to ensure your department is assigned.</p>
             </div>
           )}
 
@@ -2753,14 +3092,15 @@ export default function AdminDashboard() {
           {/* Report sub-tabs */}
           <div className="flex items-center gap-1 flex-wrap">
             {([
-              { id: 'overview',    label: 'Overview',           icon: BarChart3 },
-              { id: 'students',    label: 'Student Performance', icon: Users },
-              { id: 'attempts',    label: 'Quiz Attempts',       icon: Activity },
-              { id: 'qbank',       label: 'Question Bank',       icon: BookOpen },
-              { id: 'risk',        label: 'Risk / Intervention', icon: ShieldAlert },
-              { id: 'category',    label: 'Category Performance',icon: Layers },
-              { id: 'engagement',  label: 'Engagement',          icon: CalendarDays },
-              { id: 'trend',       label: 'Activity Trend',      icon: Flame },
+              { id: 'overview',     label: 'Overview',              icon: BarChart3 },
+              ...(adminDepartmentsList.length > 1 ? [{ id: 'departments' as ReportTab, label: 'Department Breakdown', icon: Building2 }] : []),
+              { id: 'students',     label: 'Student Performance',   icon: Users },
+              { id: 'attempts',     label: 'Quiz Attempts',          icon: Activity },
+              { id: 'qbank',        label: 'Question Bank',          icon: BookOpen },
+              { id: 'risk',         label: 'Risk / Intervention',    icon: ShieldAlert },
+              { id: 'category',     label: 'Category Performance',   icon: Layers },
+              { id: 'engagement',   label: 'Engagement',             icon: CalendarDays },
+              { id: 'trend',        label: 'Activity Trend',         icon: Flame },
             ] as { id: ReportTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => setReportTab(id)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all border ${reportTab === id ? 'bg-[#0f172a] text-white dark:bg-white dark:text-black border-[#0f172a] dark:border-white shadow-sm' : 'text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                 <Icon className="w-3.5 h-3.5" />{label}
@@ -2771,14 +3111,15 @@ export default function AdminDashboard() {
           {/* Report content */}
           {stats && (
             <>
-              {reportTab === 'overview'   && <OverviewReport    stats={stats}   questions={questions} leaderboard={leaderboard} />}
-              {reportTab === 'students'   && <StudentReport     leaderboard={leaderboard} adminToken={adminToken} />}
-              {reportTab === 'attempts'   && <AttemptsReport    leaderboard={leaderboard} />}
-              {reportTab === 'qbank'      && <QuestionBankReport questions={questions} />}
-              {reportTab === 'risk'       && <RiskReport        leaderboard={leaderboard} stats={stats} />}
-              {reportTab === 'category'   && <CategoryReport    questions={questions} leaderboard={leaderboard} />}
-              {reportTab === 'engagement' && <EngagementReport  leaderboard={leaderboard} stats={stats} />}
-              {reportTab === 'trend'      && <TrendReport       leaderboard={leaderboard} stats={stats} />}
+              {reportTab === 'overview'    && <OverviewReport     stats={stats} questions={questions} leaderboard={leaderboard} />}
+              {reportTab === 'departments' && <DepartmentsReport  departments={adminDepartmentsList} leaderboard={leaderboard} onSelectDepartment={() => setReportTab('students')} />}
+              {reportTab === 'students'    && <StudentReport      leaderboard={leaderboard} adminToken={adminToken} />}
+              {reportTab === 'attempts'    && <AttemptsReport     leaderboard={leaderboard} />}
+              {reportTab === 'qbank'       && <QuestionBankReport questions={questions} />}
+              {reportTab === 'risk'        && <RiskReport         leaderboard={leaderboard} stats={stats} />}
+              {reportTab === 'category'    && <CategoryReport     questions={questions} leaderboard={leaderboard} />}
+              {reportTab === 'engagement'  && <EngagementReport   leaderboard={leaderboard} stats={stats} />}
+              {reportTab === 'trend'       && <TrendReport        leaderboard={leaderboard} stats={stats} />}
             </>
           )}
         </div>
@@ -2792,7 +3133,11 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Change Registration Key</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                {(targetDeptForEdit?.registrationKey || adminDepartment?.registrationKey)
+                  ? 'Change Registration Key'
+                  : 'Create Department Registration Key'}
+              </h3>
             </div>
             <button onClick={() => { setKeyModalOpen(false); setTargetDeptForEdit(null); }} className="btn-icon">
               <X className="w-4 h-4" />
@@ -2800,47 +3145,64 @@ export default function AdminDashboard() {
           </div>
 
           <form onSubmit={handleUpdateRegistrationKey} className="p-5 space-y-4">
-            <div>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                Department: <strong className="text-slate-900 dark:text-white">{targetDeptForEdit?.departmentName || adminDepartment?.departmentName}</strong>
-              </p>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Current Key: <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-slate-800 dark:text-slate-200">{targetDeptForEdit?.registrationKey || adminDepartment?.registrationKey}</code>
-              </p>
-            </div>
+            {!(targetDeptForEdit?.registrationKey || adminDepartment?.registrationKey) ? (
+              <div className="p-3.5 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-200 space-y-1.5">
+                <p className="font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  Welcome to your department console!
+                </p>
+                <p className="leading-relaxed text-[11px]">
+                  Please choose the registration key that students in <strong>{targetDeptForEdit?.departmentName || adminDepartment?.departmentName}</strong> will use to register and participate in the daily cybersecurity quiz.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  Department: <strong className="text-slate-900 dark:text-white">{targetDeptForEdit?.departmentName || adminDepartment?.departmentName}</strong>
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Current Key: <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-slate-800 dark:text-slate-200">{targetDeptForEdit?.registrationKey || adminDepartment?.registrationKey}</code>
+                </p>
+              </div>
+            )}
 
             <div>
               <label htmlFor="newRegKey" className="field-label">
-                New Registration Key <span className="text-rose-500">*</span>
+                {(targetDeptForEdit?.registrationKey || adminDepartment?.registrationKey)
+                  ? 'New Registration Key'
+                  : 'Department Registration Key'} <span className="text-rose-500">*</span>
               </label>
               <input
                 id="newRegKey"
                 type="text"
                 value={newKeyInput}
                 onChange={e => setNewKeyInput(e.target.value)}
-                placeholder="e.g. MITCSE2027 or CSE-NEW"
-                className="field-input"
+                placeholder="e.g. MITCSE2026, MECH-A, or XYZ-CS"
+                className="field-input font-mono"
                 autoFocus
+                required
               />
               <p className="field-helper text-[11px] mt-1">
-                You can choose any custom string (alphabetic, numbers, symbols, spaces). No minimum length or complexity required.
+                Choose a unique registration code you will distribute to students in this department.
               </p>
             </div>
 
-            <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-200 space-y-1">
-              <p className="font-bold flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                Permanent Student Association
-              </p>
-              <p className="leading-relaxed">
-                Changing this key only affects NEW registrations. All existing students already registered in this department will remain permanently associated and their quiz records will not be changed.
-              </p>
-            </div>
+            {(targetDeptForEdit?.registrationKey || adminDepartment?.registrationKey) && (
+              <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-200 space-y-1">
+                <p className="font-bold flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  Permanent Student Association
+                </p>
+                <p className="leading-relaxed">
+                  Changing this key only affects NEW registrations. All existing students already registered in this department will remain permanently associated and their quiz records will not be changed.
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => setKeyModalOpen(false)}
+                onClick={() => { setKeyModalOpen(false); setTargetDeptForEdit(null); }}
                 className="btn btn-secondary btn-sm"
               >
                 Cancel
@@ -2848,10 +3210,14 @@ export default function AdminDashboard() {
               <button
                 type="submit"
                 disabled={keyUpdating || !newKeyInput.trim()}
-                className="btn btn-primary btn-sm gap-1.5"
+                className="btn btn-primary btn-sm gap-1.5 font-bold"
               >
                 {keyUpdating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                <span>Save New Key</span>
+                <span>
+                  {(targetDeptForEdit?.registrationKey || adminDepartment?.registrationKey)
+                    ? 'Save New Key'
+                    : 'Save & Activate Key'}
+                </span>
               </button>
             </div>
           </form>
@@ -2859,76 +3225,113 @@ export default function AdminDashboard() {
       </div>
     )}
 
-    {/* Add Department & Key Modal */}
-    {isNewDeptModalOpen && (
+    {/* Change Password Modal */}
+    {passwordModalOpen && (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
         <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Department &amp; Registration Key</h3>
+              <Key className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Change Login Password</h3>
             </div>
-            <button onClick={() => setIsNewDeptModalOpen(false)} className="btn-icon">
+            <button onClick={() => setPasswordModalOpen(false)} className="btn-icon">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <form onSubmit={handleCreateDepartment} className="p-5 space-y-4">
+          <form onSubmit={handleUpdatePassword} className="p-5 space-y-4">
             <div>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                College: <strong className="text-slate-900 dark:text-white">{adminCollege?.name || 'Your Assigned College'}</strong>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Logged in as: <strong className="text-slate-900 dark:text-white">{adminEmail || 'Department Admin'}</strong>
               </p>
             </div>
 
             <div>
-              <label htmlFor="deptNameInput" className="field-label">
-                Department Name <span className="text-rose-500">*</span>
+              <label htmlFor="currentPasswordInput" className="field-label">
+                Current Password <span className="text-rose-500">*</span>
               </label>
-              <input
-                id="deptNameInput"
-                type="text"
-                value={newDeptName}
-                onChange={e => setNewDeptName(e.target.value)}
-                placeholder="e.g. Information Technology or Mechanical Engineering"
-                className="field-input"
-                autoFocus
-                required
-              />
+              <div className="relative">
+                <input
+                  id="currentPasswordInput"
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPasswordInput}
+                  onChange={e => setCurrentPasswordInput(e.target.value)}
+                  placeholder="Enter your current password"
+                  className="field-input pr-10"
+                  autoFocus
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  tabIndex={-1}
+                >
+                  {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
-              <label htmlFor="deptKeyInput" className="field-label">
-                Registration Key <span className="text-rose-500">*</span>
+              <label htmlFor="newPasswordInput" className="field-label">
+                New Password <span className="text-rose-500">*</span>
               </label>
-              <input
-                id="deptKeyInput"
-                type="text"
-                value={newDeptKey}
-                onChange={e => setNewDeptKey(e.target.value)}
-                placeholder="e.g. MITIT2026 or ABCMECH"
-                className="field-input font-mono"
-                required
-              />
+              <div className="relative">
+                <input
+                  id="newPasswordInput"
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPasswordInput}
+                  onChange={e => setNewPasswordInput(e.target.value)}
+                  placeholder="At least 6 characters"
+                  className="field-input pr-10"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  tabIndex={-1}
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="field-helper text-[11px] mt-1">
-                Enter the unique code you will distribute to students in this department.
+                Choose a strong password to protect your department admin console.
               </p>
+            </div>
+
+            <div>
+              <label htmlFor="confirmPasswordInput" className="field-label">
+                Confirm New Password <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="confirmPasswordInput"
+                type="password"
+                value={confirmPasswordInput}
+                onChange={e => setConfirmPasswordInput(e.target.value)}
+                placeholder="Re-enter your new password"
+                className="field-input"
+                required
+                minLength={6}
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => setIsNewDeptModalOpen(false)}
+                onClick={() => setPasswordModalOpen(false)}
                 className="btn btn-secondary btn-sm"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={isCreatingDept || !newDeptName.trim() || !newDeptKey.trim()}
-                className="btn btn-primary btn-sm gap-1.5"
+                disabled={passwordUpdating || !currentPasswordInput || !newPasswordInput || !confirmPasswordInput}
+                className="btn btn-primary btn-sm gap-1.5 font-bold"
               >
-                {isCreatingDept ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                <span>Create Department</span>
+                {passwordUpdating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Update Password</span>
               </button>
             </div>
           </form>

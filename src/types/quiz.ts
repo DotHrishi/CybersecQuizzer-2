@@ -55,6 +55,11 @@ export interface QuizStatusResponse {
 export interface LeaderboardEntry {
   rank: number;
   userName: string;
+  fullName?: string;
+  collegeName?: string | null;
+  departmentName?: string | null;
+  registrationKey?: string | null;
+  collegeDepartmentId?: number | null;
   attempts: number;
   correctAnswers: number;
   totalPoints: number;

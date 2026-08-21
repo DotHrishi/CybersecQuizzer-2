@@ -744,7 +744,7 @@ export const dataService = {
   /* ─── College Department & Registration Key Management ───── */
   async findDepartmentByRegistrationKey(key: string) {
     const cleanKey = normalizeRegistrationKey(key);
-    if (!cleanKey) return null;
+    if (!cleanKey || cleanKey.startsWith('PENDING_KEY_')) return null;
 
     if (isSupabaseConfigured) {
       try {
@@ -1523,10 +1523,30 @@ export const dataService = {
         return a.avgResponseTimeMs - b.avgResponseTimeMs;
       });
 
-      return aggregated.slice(0, 100).map((item, index) => ({
-        rank: index + 1,
-        ...item,
-      }));
+      // Fetch students in scope to attach department and registration key metadata
+      const scopedStudents = await this.getStudentsByScope(scope);
+      const studentMap = new Map<string, any>();
+      for (const s of scopedStudents) {
+        studentMap.set(s.nickname.trim().toLowerCase(), s);
+      }
+
+      return aggregated.slice(0, 100).map((item, index) => {
+        const student = studentMap.get(item.userName.trim().toLowerCase());
+        const collegeName = student?.collegeDepartment?.college?.name || student?.college?.name || null;
+        const departmentName = student?.collegeDepartment?.departmentName || null;
+        const registrationKey = student?.collegeDepartment?.registrationKey || null;
+        const collegeDepartmentId = student?.collegeDepartmentId || null;
+
+        return {
+          rank: index + 1,
+          ...item,
+          fullName: student?.fullName || item.userName,
+          collegeName,
+          departmentName,
+          registrationKey,
+          collegeDepartmentId,
+        };
+      });
     } catch (dbErr) {
       console.error('getLeaderboardByScope failed:', dbErr);
       return [];

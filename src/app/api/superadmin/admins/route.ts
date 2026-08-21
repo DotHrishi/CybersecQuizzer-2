@@ -52,13 +52,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email, password, name, collegeId, collegeName, collegeIdentifier, collegeDepartmentId, active } = validation.data;
+    const { email, password, name, collegeId, collegeName, collegeIdentifier, departmentName, collegeDepartmentId, active } = validation.data;
     const cleanEmail = email.trim().toLowerCase();
 
     let targetCollegeId = collegeId;
+    let targetCollegeDepartmentId = collegeDepartmentId;
     let targetDepartmentName: string | undefined;
 
-    // Handle combined form: if collegeName is provided, find or create the college
+    // 1. Resolve or Create College
     if (!targetCollegeId && (collegeName || collegeIdentifier)) {
       const cleanColName = (collegeName || '').trim();
       let cleanIdent = (collegeIdentifier || '').trim().toUpperCase();
@@ -96,35 +97,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (collegeDepartmentId) {
-      const dept = await dataService.getDepartmentById(collegeDepartmentId);
-      if (!dept) {
-        return NextResponse.json({ success: false, message: 'The selected department does not exist.' }, { status: 400 });
+    // 2. Resolve or Create Department under the target college
+    if (targetCollegeId && departmentName?.trim()) {
+      const cleanDeptName = departmentName.trim();
+      const depts = await dataService.getDepartmentsByCollege(targetCollegeId);
+      let dept = depts.find(d => d.departmentName.toLowerCase() === cleanDeptName.toLowerCase());
+
+      if (dept) {
+        targetCollegeDepartmentId = dept.id;
+        targetDepartmentName = dept.departmentName;
+      } else {
+        const pendingKey = `PENDING_KEY_${Date.now()}_${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+        const createdDept = await dataService.createDepartment({
+          collegeId: targetCollegeId,
+          departmentName: cleanDeptName,
+          registrationKey: pendingKey,
+        });
+        targetCollegeDepartmentId = createdDept.id;
+        targetDepartmentName = createdDept.departmentName;
       }
-      targetCollegeId = dept.collegeId;
-      targetDepartmentName = dept.departmentName;
+    } else if (targetCollegeDepartmentId) {
+      const dept = await dataService.getDepartmentById(targetCollegeDepartmentId);
+      if (dept) {
+        targetCollegeId = dept.collegeId;
+        targetDepartmentName = dept.departmentName;
+      }
     }
 
-    if (targetCollegeId) {
-      const college = await dataService.getCollegeById(targetCollegeId);
-      if (!college) {
-        return NextResponse.json({ success: false, message: 'The selected college does not exist.' }, { status: 400 });
-      }
-
-      // Enforce strictly 1 admin per college
-      const existingCollegeAdmins = await dataService.getAdminsByCollegeId(targetCollegeId);
-      if (existingCollegeAdmins && existingCollegeAdmins.length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `An admin account (${existingCollegeAdmins[0].email}) already exists for "${college.name}". Only one admin is permitted per college.`,
-          },
-          { status: 409 }
-        );
-      }
-    }
-
-    // Check if email already registered
+    // 3. Check if email already registered
     const existing = await dataService.getAdminByEmail(cleanEmail);
     if (existing) {
       return NextResponse.json(
@@ -133,14 +133,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hash password and store
+    // 4. Hash password and store
     const passwordHash = hashPassword(password);
     const newAdmin = await dataService.createAdmin({
       email: cleanEmail,
       passwordHash,
       name: name?.trim() || undefined,
       collegeId: targetCollegeId,
-      collegeDepartmentId,
+      collegeDepartmentId: targetCollegeDepartmentId,
       active: active ?? true,
     });
 
