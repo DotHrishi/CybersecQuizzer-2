@@ -2453,15 +2453,13 @@ export default function AdminDashboard() {
                 </p>
               </div>
             </div>
-            {(!adminDepartment || adminDepartmentsList.length > 1) && (
-              <button
-                onClick={() => setIsNewDeptModalOpen(true)}
-                className="btn btn-primary btn-sm gap-1.5 shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Department &amp; Key</span>
-              </button>
-            )}
+            <button
+              onClick={() => setIsNewDeptModalOpen(true)}
+              className="btn btn-primary btn-sm gap-1.5 shrink-0 shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add Department &amp; Key</span>
+            </button>
           </div>
 
           {/* Department Cards or List */}

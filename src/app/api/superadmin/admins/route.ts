@@ -52,11 +52,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email, password, name, collegeId, collegeDepartmentId, active } = validation.data;
+    const { email, password, name, collegeId, collegeName, collegeIdentifier, collegeDepartmentId, active } = validation.data;
     const cleanEmail = email.trim().toLowerCase();
 
     let targetCollegeId = collegeId;
     let targetDepartmentName: string | undefined;
+
+    // Handle combined form: if collegeName / collegeIdentifier are provided, find or create the college
+    if (!targetCollegeId && (collegeName || collegeIdentifier)) {
+      const cleanIdent = (collegeIdentifier || collegeName || '').trim().toUpperCase();
+      const cleanColName = (collegeName || collegeIdentifier || '').trim();
+
+      // Check if college exists by identifier or name
+      let foundCollege = cleanIdent ? await dataService.findCollegeByIdentifier(cleanIdent) : null;
+      if (!foundCollege && cleanColName) {
+        foundCollege = await dataService.findCollegeByName(cleanColName);
+      }
+
+      if (foundCollege) {
+        targetCollegeId = foundCollege.id;
+      } else {
+        const createdCollege = await dataService.createCollege({
+          name: cleanColName,
+          identifier: cleanIdent,
+        });
+        targetCollegeId = createdCollege.id;
+      }
+    }
 
     if (collegeDepartmentId) {
       const dept = await dataService.getDepartmentById(collegeDepartmentId);
@@ -65,8 +87,8 @@ export async function POST(req: NextRequest) {
       }
       targetCollegeId = dept.collegeId;
       targetDepartmentName = dept.departmentName;
-    } else if (collegeId) {
-      const college = await dataService.getCollegeById(collegeId);
+    } else if (targetCollegeId) {
+      const college = await dataService.getCollegeById(targetCollegeId);
       if (!college) {
         return NextResponse.json({ success: false, message: 'The selected college does not exist.' }, { status: 400 });
       }

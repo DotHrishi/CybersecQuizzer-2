@@ -8,7 +8,7 @@ import {
   UserCheck, UserX, Copy, Check, LogOut, ArrowLeft,
   Sparkles, Users, AlertTriangle, X, Loader2, Sun, Moon,
   User, Building2, Edit3, School, GraduationCap, KeyRound, Layers,
-  ExternalLink, ChevronRight, Tag
+  ExternalLink, ChevronRight, Tag, UserPlus
 } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import toast from 'react-hot-toast';
@@ -75,7 +75,25 @@ interface AdminAccount {
   updatedAt: string;
 }
 
+interface CreatedCreds {
+  collegeName: string;
+  collegeIdentifier: string;
+  email: string;
+  password: string;
+  name?: string;
+  loginUrl: string;
+}
+
 const STORAGE_KEY = 'cybersec_superadmin_token';
+
+/* ─── Identifier generator helper ───────────────────────── */
+function generateIdentifier(name: string): string {
+  if (!name.trim()) return '';
+  const clean = name.trim().replace(/[^a-zA-Z0-9\s\-_]/g, '');
+  const words = clean.split(/[\s\-_]+/).filter(Boolean);
+  if (words.length === 1) return words[0].substring(0, 8).toUpperCase();
+  return words.map(w => w.charAt(0)).join('').toUpperCase().substring(0, 8);
+}
 
 /* ─── Password generator helper ──────────────────────────── */
 function generateStrongPassword(length = 12): string {
@@ -97,7 +115,7 @@ export default function SuperAdminDashboard() {
   const [loginLoading, setLoginLoading] = useState(false);
 
   /* Active view tab */
-  const [activeTab, setActiveTab] = useState<'colleges' | 'departments' | 'admins'>('colleges');
+  const [activeTab, setActiveTab] = useState<'admins' | 'colleges'>('admins');
 
   /* Colleges data */
   const [colleges, setColleges] = useState<CollegeItem[]>([]);
@@ -148,7 +166,7 @@ export default function SuperAdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
   const [collegeFilter, setCollegeFilter] = useState<string>('all');
 
-  /* Admin Modals */
+  /* Combined Admin Creation Modal */
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
@@ -159,6 +177,10 @@ export default function SuperAdminDashboard() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isSavingAdmin, setIsSavingAdmin] = useState(false);
   const [copiedNewCreds, setCopiedNewCreds] = useState(false);
+
+  /* Success Credentials Card Modal */
+  const [createdCredsModal, setCreatedCredsModal] = useState<CreatedCreds | null>(null);
+  const [copiedSummary, setCopiedSummary] = useState(false);
 
   /* Password Reset Modal */
   const [resetModalAdmin, setResetModalAdmin] = useState<AdminAccount | null>(null);
@@ -554,11 +576,11 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  /* ── Create Admin ── */
+  /* ── Create Admin & College in Combined Single Step ── */
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEmail.trim() || !newPassword.trim() || !newAdminCollegeId) {
-      toast.error('Email, College selection, and Password are all required.');
+    if (!newCollegeName.trim() || !newCollegeIdentifier.trim() || !newEmail.trim() || !newPassword.trim()) {
+      toast.error('College Name, Identifier Code, Admin Email, and Password are all required.');
       return;
     }
 
@@ -571,10 +593,10 @@ export default function SuperAdminDashboard() {
           'x-superadmin-token': token || '',
         },
         body: JSON.stringify({
+          collegeName: newCollegeName.trim(),
+          collegeIdentifier: newCollegeIdentifier.trim().toUpperCase(),
           email: newEmail.trim().toLowerCase(),
           name: newAdminName.trim() || undefined,
-          collegeId: Number(newAdminCollegeId),
-          collegeDepartmentId: newAdminDeptId ? Number(newAdminDeptId) : undefined,
           password: newPassword,
           active: newActive,
         }),
@@ -584,6 +606,16 @@ export default function SuperAdminDashboard() {
       if (data.success) {
         toast.success(`Admin account created for "${newEmail}"!`);
         setAddModalOpen(false);
+        setCreatedCredsModal({
+          collegeName: data.admin?.college?.name || newCollegeName.trim(),
+          collegeIdentifier: data.admin?.college?.identifier || newCollegeIdentifier.trim().toUpperCase(),
+          email: newEmail.trim().toLowerCase(),
+          password: newPassword,
+          name: newAdminName.trim() || undefined,
+          loginUrl: `${window.location.origin}/admin`,
+        });
+        setNewCollegeName('');
+        setNewCollegeIdentifier('');
         setNewEmail('');
         setNewAdminName('');
         setNewAdminCollegeId('');
@@ -744,6 +776,7 @@ export default function SuperAdminDashboard() {
   const activeAdmins = admins.filter(a => a.active).length;
   const totalConfiguredColleges = nonDummyColleges.length;
   const totalDepartments = departments.length;
+  const totalStudents = colleges.reduce((acc, c) => acc + (c._count?.students || c.studentCount || 0), 0);
 
   /* ── Top Header Component for SystemAdmin Portal ── */
   const SuperAdminHeader = () => (
@@ -914,108 +947,60 @@ export default function SuperAdminDashboard() {
               Institution &amp; Admin Management
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Configure colleges, departments, registration keys, and provision scoped admin credentials.
+              Provision institutional administrators with all-in-one college and admin credential setup.
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {activeTab === 'colleges' && (
-              <button
-                onClick={() => {
-                  setNewCollegeName('');
-                  setNewCollegeIdentifier('');
-                  setNewInitialDeptName('');
-                  setNewInitialRegKey('');
-                  setAddCollegeModalOpen(true);
-                }}
-                className="btn btn-primary btn-md gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Configure College</span>
-              </button>
-            )}
-
-            {activeTab === 'departments' && (
-              <button
-                onClick={() => {
-                  setNewDeptCollegeId(nonDummyColleges.length > 0 ? nonDummyColleges[0].id : '');
-                  setNewDeptName('');
-                  setNewDeptRegKey('');
-                  setAddDepartmentModalOpen(true);
-                }}
-                className="btn btn-primary btn-md gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Department &amp; Key</span>
-              </button>
-            )}
-
-            {activeTab === 'admins' && (
-              <button
-                onClick={() => {
-                  setNewEmail('');
-                  setNewAdminName('');
-                  setNewAdminCollegeId(nonDummyColleges.length > 0 ? nonDummyColleges[0].id : '');
-                  setNewAdminDeptId('');
-                  setNewPassword('');
-                  setNewActive(true);
-                  setCopiedNewCreds(false);
-                  setShowNewPassword(false);
-                  setAddModalOpen(true);
-                }}
-                className="btn btn-primary btn-md gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add New Admin</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setNewCollegeName('');
+                setNewCollegeIdentifier('');
+                setNewEmail('');
+                setNewAdminName('');
+                setNewPassword('');
+                setNewActive(true);
+                setCopiedNewCreds(false);
+                setShowNewPassword(false);
+                setAddModalOpen(true);
+              }}
+              className="btn btn-primary btn-md gap-2 shadow-md font-bold"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Add New College Admin</span>
+            </button>
           </div>
         </div>
 
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-px">
           <button
-            onClick={() => setActiveTab('colleges')}
-            className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-              activeTab === 'colleges'
-                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-extrabold'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <School className="w-4 h-4" />
-            <span>Colleges &amp; Schools</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
-              {totalConfiguredColleges}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('departments')}
-            className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-              activeTab === 'departments'
-                ? 'border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400 font-extrabold'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>Departments &amp; Keys</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-              {totalDepartments}
-            </span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('admins')}
             className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'admins'
-                ? 'border-slate-900 text-slate-900 dark:border-slate-100 dark:text-white font-extrabold'
+                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-extrabold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Users className="w-4 h-4" />
             <span>Admin Accounts</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
               {totalAdmins}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('colleges')}
+            className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'colleges'
+                ? 'border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400 font-extrabold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <School className="w-4 h-4" />
+            <span>Institutions Overview</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+              {totalConfiguredColleges}
             </span>
           </button>
         </div>
@@ -1023,62 +1008,26 @@ export default function SuperAdminDashboard() {
         {/* Clickable KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div
-            onClick={() => setActiveTab('colleges')}
+            onClick={() => setActiveTab('admins')}
             className={`card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] ${
-              activeTab === 'colleges'
+              activeTab === 'admins'
                 ? 'ring-2 ring-blue-500 border-blue-300 dark:border-blue-700 shadow-md'
                 : 'border-blue-200/60 dark:border-blue-900/40 hover:border-blue-400'
             }`}
           >
             <div>
-              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Colleges</p>
-              <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{totalConfiguredColleges}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Active institutions</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
-              <School className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-
-          <div
-            onClick={() => setActiveTab('departments')}
-            className={`card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] ${
-              activeTab === 'departments'
-                ? 'ring-2 ring-emerald-500 border-emerald-300 dark:border-emerald-700 shadow-md'
-                : 'border-emerald-200/60 dark:border-emerald-900/40 hover:border-emerald-400'
-            }`}
-          >
-            <div>
-              <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Departments &amp; Keys</p>
-              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{totalDepartments}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Active registration keys</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
-              <KeyRound className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-          </div>
-
-          <div
-            onClick={() => setActiveTab('admins')}
-            className={`card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] ${
-              activeTab === 'admins'
-                ? 'ring-2 ring-slate-400 dark:ring-slate-600 shadow-md'
-                : 'border-slate-200 dark:border-slate-800 hover:border-slate-400'
-            }`}
-          >
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Admins</p>
-              <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{totalAdmins}</p>
+              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Total Admins</p>
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{totalAdmins}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Provisioned accounts</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-              <Users className="w-6 h-6 text-slate-700 dark:text-slate-300" />
+            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
+              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
 
           <div
             onClick={() => setActiveTab('admins')}
-            className={`card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] border-emerald-200/60 dark:border-emerald-900/40 hover:border-emerald-400`}
+            className="card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] border-emerald-200/60 dark:border-emerald-900/40 hover:border-emerald-400"
           >
             <div>
               <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Active Admins</p>
@@ -1087,6 +1036,38 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
               <UserCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+          </div>
+
+          <div
+            onClick={() => setActiveTab('colleges')}
+            className={`card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] ${
+              activeTab === 'colleges'
+                ? 'ring-2 ring-emerald-500 border-emerald-300 dark:border-emerald-700 shadow-md'
+                : 'border-emerald-200/60 dark:border-emerald-900/40 hover:border-emerald-400'
+            }`}
+          >
+            <div>
+              <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Institutions</p>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{totalConfiguredColleges}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Active colleges &amp; schools</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
+              <School className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+          </div>
+
+          <div
+            onClick={() => setActiveTab('colleges')}
+            className="card p-5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] border-slate-200 dark:border-slate-800 hover:border-slate-400"
+          >
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Students</p>
+              <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{totalStudents}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Enrolled participants</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <GraduationCap className="w-6 h-6 text-slate-700 dark:text-slate-300" />
             </div>
           </div>
         </div>
@@ -1216,37 +1197,13 @@ export default function SuperAdminDashboard() {
                                     </span>
                                   ))}
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setNewDeptCollegeId(c.id);
-                                      setNewDeptName('');
-                                      setNewDeptRegKey('');
-                                      setAddDepartmentModalOpen(true);
-                                    }}
-                                    title="Add another department & key to this college"
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-                                  >
-                                    <Plus className="w-3 h-3" /> Add Key
-                                  </button>
                                 </div>
                               )}
 
                               {!isDummy && collegeDepts.length === 0 && (
-                                <div className="mt-1.5 pl-6">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setNewDeptCollegeId(c.id);
-                                      setNewDeptName('');
-                                      setNewDeptRegKey('');
-                                      setAddDepartmentModalOpen(true);
-                                    }}
-                                    className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-                                  >
-                                    <KeyRound className="w-3 h-3" /> + Add Department &amp; Registration Key
-                                  </button>
-                                </div>
+                                <p className="mt-1 pl-6 text-[11px] text-slate-400 italic">
+                                  Departments &amp; keys can be added by the college admin in their admin panel.
+                                </p>
                               )}
                             </div>
                           </td>
@@ -1257,25 +1214,17 @@ export default function SuperAdminDashboard() {
                             </span>
                           </td>
 
-                          <td className="table-td text-center text-xs font-bold text-blue-600 dark:text-blue-400">
-                            <button
-                              onClick={() => {
-                                setDeptCollegeFilter(String(c.id));
-                                setActiveTab('departments');
-                              }}
-                              className="hover:underline inline-flex items-center gap-1 cursor-pointer"
-                              title="View departments in Departments tab"
-                            >
-                              <span>{collegeDepts.length}</span>
-                              <ChevronRight className="w-3 h-3 text-slate-400" />
-                            </button>
+                          <td className="table-td text-center text-xs font-bold text-slate-700 dark:text-slate-300">
+                            <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                              {collegeDepts.length}
+                            </span>
                           </td>
 
-                          <td className="table-td text-center text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <td className="table-td text-center text-xs font-bold text-blue-600 dark:text-blue-400">
                             {c._count?.admins ?? 0}
                           </td>
 
-                          <td className="table-td text-center text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                          <td className="table-td text-center text-xs font-bold text-emerald-600 dark:text-emerald-400">
                             {c._count?.students ?? 0}
                           </td>
 
@@ -1284,19 +1233,6 @@ export default function SuperAdminDashboard() {
                               <span className="text-[11px] text-slate-400 italic">System Managed</span>
                             ) : (
                               <div className="inline-flex items-center gap-1.5">
-                                <button
-                                  onClick={() => {
-                                    setNewDeptCollegeId(c.id);
-                                    setNewDeptName('');
-                                    setNewDeptRegKey('');
-                                    setAddDepartmentModalOpen(true);
-                                  }}
-                                  title="Add Department & Key"
-                                  className="btn-icon text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
-                                >
-                                  <KeyRound className="w-3.5 h-3.5" />
-                                </button>
-
                                 <button
                                   onClick={() => {
                                     setEditCollegeModal(c);
@@ -1329,170 +1265,7 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {/* ── TAB 2: Departments & Keys ── */}
-        {activeTab === 'departments' && (
-          <div className="card overflow-hidden">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/20">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Departments &amp; Registration Keys</h2>
-                <span className="text-xs text-slate-400">({filteredDepartments.length})</span>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={departmentSearch}
-                    onChange={e => setDepartmentSearch(e.target.value)}
-                    placeholder="Search department, key or college..."
-                    className="field-input pl-8 py-1.5 text-xs w-full"
-                  />
-                  {departmentSearch && (
-                    <button onClick={() => setDepartmentSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                <select
-                  value={deptCollegeFilter}
-                  onChange={e => setDeptCollegeFilter(e.target.value)}
-                  className="field-input py-1.5 px-2 text-xs w-auto"
-                >
-                  <option value="all">All Colleges</option>
-                  {nonDummyColleges.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={() => {
-                    fetchDepartments();
-                    fetchColleges();
-                  }}
-                  disabled={loadingDepartments}
-                  title="Refresh list"
-                  className="btn btn-secondary btn-sm px-2.5"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingDepartments ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            </div>
-
-            <div className="table-wrapper">
-              <table className="table-base">
-                <thead className="table-head">
-                  <tr>
-                    <th className="table-th">College / Institution</th>
-                    <th className="table-th">Department Name</th>
-                    <th className="table-th">Active Registration Key</th>
-                    <th className="table-th text-center">Admins</th>
-                    <th className="table-th text-center">Enrolled Students</th>
-                    <th className="table-th text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingDepartments && departments.length === 0 ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <tr key={i} className="border-b border-slate-100 dark:border-slate-800 animate-pulse">
-                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-40" /></td>
-                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32" /></td>
-                        <td className="table-td"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
-                        <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-12 mx-auto" /></td>
-                        <td className="table-td text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-12 mx-auto" /></td>
-                        <td className="table-td text-right"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-16 ml-auto" /></td>
-                      </tr>
-                    ))
-                  ) : filteredDepartments.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400">
-                        <div className="max-w-xs mx-auto space-y-3">
-                          <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                            <Layers className="w-6 h-6 text-slate-400" />
-                          </div>
-                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                            {departmentSearch ? 'No departments matching search.' : 'No departments configured yet.'}
-                          </p>
-                          <p className="text-xs text-slate-400 leading-relaxed">
-                            Click &quot;Add Department &amp; Key&quot; to set up department registration keys.
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredDepartments.map(dept => (
-                      <tr key={dept.id} className="table-row">
-                        <td className="table-td font-semibold text-slate-900 dark:text-white">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                            <span>{dept.college?.name || 'Unknown College'}</span>
-                          </div>
-                        </td>
-
-                        <td className="table-td font-bold text-slate-900 dark:text-white">
-                          {dept.departmentName}
-                        </td>
-
-                        <td className="table-td font-mono text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 font-black text-emerald-700 dark:text-emerald-300 shadow-xs">
-                              {dept.registrationKey}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(dept.registrationKey);
-                                toast.success(`Key "${dept.registrationKey}" copied!`);
-                              }}
-                              title="Copy registration key"
-                              className="btn-icon w-6 h-6 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                            >
-                              <Copy className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-
-                        <td className="table-td text-center text-xs font-bold text-slate-700 dark:text-slate-300">
-                          {dept._count?.admins ?? 0}
-                        </td>
-
-                        <td className="table-td text-center text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                          {dept._count?.students ?? 0}
-                        </td>
-
-                        <td className="table-td text-right">
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              onClick={() => {
-                                setEditDeptModal(dept);
-                                setEditDeptName(dept.departmentName);
-                                setEditDeptRegKey(dept.registrationKey);
-                              }}
-                              title="Edit Department / Key"
-                              className="btn-icon text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-
-                            <button
-                              onClick={() => setDeleteDeptModal(dept)}
-                              title="Delete Department"
-                              className="btn-icon text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* ── TAB 3: Admin Accounts List ── */}
         {activeTab === 'admins' && (
@@ -1682,100 +1455,227 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {/* ── Modal: Add New College ── */}
-        {addCollegeModalOpen && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setAddCollegeModalOpen(false); }}>
-            <div className="modal-panel max-w-[520px]">
+        {/* ── Modal: Unified Add New College Admin (All-In-One Form) ── */}
+        {addModalOpen && (
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setAddModalOpen(false); }}>
+            <div className="modal-panel max-w-[540px]">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
-                    <School className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <UserPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Configure New College / School</h3>
-                    <p className="text-[11px] text-slate-500">Add an official institution and optional initial registration key</p>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Configure New College &amp; Admin</h3>
+                    <p className="text-[11px] text-slate-500">Provision institution and college admin credentials in a single step</p>
                   </div>
                 </div>
-                <button onClick={() => setAddCollegeModalOpen(false)} className="btn-icon">
+                <button onClick={() => setAddModalOpen(false)} className="btn-icon">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateCollege} className="p-6 space-y-4">
-                <div>
-                  <label className="field-label">Official College Name <span className="text-rose-500">*</span></label>
-                  <input
-                    type="text"
-                    value={newCollegeName}
-                    onChange={e => setNewCollegeName(e.target.value)}
-                    placeholder="e.g. MIT - WPU University Pune"
-                    className="field-input"
-                    required
-                    autoFocus
-                  />
-                  <p className="field-helper mt-1 text-[11px]">
-                    This is the official institution name.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="field-label">Unique Identifier Code <span className="text-rose-500">*</span></label>
-                  <input
-                    type="text"
-                    value={newCollegeIdentifier}
-                    onChange={e => setNewCollegeIdentifier(e.target.value.toUpperCase())}
-                    placeholder="e.g. MITWPU-PUNE"
-                    className="field-input font-mono uppercase"
-                    required
-                  />
-                  <p className="field-helper mt-1 text-[11px]">
-                    Short code for reports and certificate serializing.
-                  </p>
-                </div>
-
-                {/* Optional Initial Department & Registration Key */}
-                <div className="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900 dark:text-blue-200">
-                    <KeyRound className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    <span>Initial Department &amp; Registration Key (Optional)</span>
+              <form onSubmit={handleCreateAdmin} className="p-6 space-y-4">
+                {/* ── Section 1: Institution Details ── */}
+                <div className="space-y-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <label className="field-label">Official College Name <span className="text-rose-500">*</span></label>
+                    <input
+                      type="text"
+                      list="existing-colleges-list"
+                      value={newCollegeName}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setNewCollegeName(val);
+                        const match = nonDummyColleges.find(c => c.name.toLowerCase() === val.toLowerCase());
+                        if (match) {
+                          setNewCollegeIdentifier(match.identifier);
+                        } else if (!newCollegeIdentifier || newCollegeIdentifier === generateIdentifier(newCollegeName)) {
+                          setNewCollegeIdentifier(generateIdentifier(val));
+                        }
+                      }}
+                      placeholder="e.g. MIT - WPU University Pune"
+                      className="field-input"
+                      required
+                      autoFocus
+                    />
+                    <datalist id="existing-colleges-list">
+                      {nonDummyColleges.map(c => (
+                        <option key={c.id} value={c.name}>{c.identifier}</option>
+                      ))}
+                    </datalist>
+                    <p className="field-helper mt-1 text-[11px]">
+                      This is the official institution name.
+                    </p>
                   </div>
 
                   <div>
-                    <label className="field-label text-[11px] mb-1">Department Name</label>
+                    <label className="field-label">Unique Identifier Code <span className="text-rose-500">*</span></label>
                     <input
                       type="text"
-                      value={newInitialDeptName}
-                      onChange={e => setNewInitialDeptName(e.target.value)}
-                      placeholder="e.g. Computer Science & Engineering"
-                      className="field-input text-xs"
+                      value={newCollegeIdentifier}
+                      onChange={e => setNewCollegeIdentifier(e.target.value.toUpperCase().replace(/\s+/g, '-'))}
+                      placeholder="E.G. MITWPU-PUNE"
+                      className="field-input font-mono uppercase"
+                      required
                     />
-                  </div>
-
-                  <div>
-                    <label className="field-label text-[11px] mb-1">Registration Key</label>
-                    <input
-                      type="text"
-                      value={newInitialRegKey}
-                      onChange={e => setNewInitialRegKey(e.target.value)}
-                      placeholder="e.g. MITCSE2026"
-                      className="field-input text-xs font-mono"
-                    />
-                    <p className="field-helper text-[10px] mt-0.5">
-                      You can also create more departments and keys later in the &quot;Departments &amp; Keys&quot; tab.
+                    <p className="field-helper mt-1 text-[11px]">
+                      Short code for reports and certificate serializing.
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-                  <button type="button" onClick={() => setAddCollegeModalOpen(false)} className="btn btn-secondary btn-sm">
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={isSavingCollege || !newCollegeName.trim() || !newCollegeIdentifier.trim()} className="btn btn-primary btn-sm gap-1.5">
-                    {isSavingCollege ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    <span>Save College</span>
-                  </button>
+                {/* ── Section 2: Admin Account Credentials ── */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="field-label">Admin Email Address <span className="text-rose-500">*</span></label>
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={e => setNewEmail(e.target.value)}
+                      placeholder="e.g. admin@mitwpu.edu.in or prof.sharma@gmail.com"
+                      className="field-input font-mono text-xs"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="field-label">Admin Full Name / Title (Optional)</label>
+                    <input
+                      type="text"
+                      value={newAdminName}
+                      onChange={e => setNewAdminName(e.target.value)}
+                      placeholder="e.g. Dr. Rajesh Sharma"
+                      className="field-input"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="field-label mb-0">Password <span className="text-rose-500">*</span></label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const gen = generateStrongPassword();
+                          setNewPassword(gen);
+                          setShowNewPassword(true);
+                        }}
+                        className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3" /> Generate Strong
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        placeholder="Enter password (min. 6 characters)..."
+                        className="field-input pr-10 font-mono text-xs"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        tabIndex={-1}
+                      >
+                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newActive}
+                      onChange={e => setNewActive(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600 border-slate-300"
+                    />
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Active immediately
+                    </span>
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setAddModalOpen(false)} className="btn btn-secondary btn-sm">
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingAdmin || !newCollegeName.trim() || !newCollegeIdentifier.trim() || !newEmail.trim() || !newPassword.trim()}
+                      className="btn btn-primary btn-sm gap-1.5 shadow-sm font-bold"
+                    >
+                      {isSavingAdmin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span>Create Admin &amp; College</span>
+                    </button>
+                  </div>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal: Success Credentials Generated ── */}
+        {createdCredsModal && (
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setCreatedCredsModal(null); }}>
+            <div className="modal-panel max-w-[500px]">
+              <div className="p-6 space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Admin Account Provisioned</h3>
+                    <p className="text-xs text-slate-500">Copy these credentials to send to the college administrator.</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5 font-mono text-xs text-slate-800 dark:text-slate-200">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <span className="text-slate-400 font-sans font-medium">Institution:</span>
+                    <span className="font-bold">{createdCredsModal.collegeName} ({createdCredsModal.collegeIdentifier})</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <span className="text-slate-400 font-sans font-medium">Admin Email:</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400">{createdCredsModal.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <span className="text-slate-400 font-sans font-medium">Password:</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{createdCredsModal.password}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-400 font-sans font-medium">Admin Portal:</span>
+                    <span className="text-xs">{createdCredsModal.loginUrl}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = `Cybersecurity Quiz Admin Credentials\nInstitution: ${createdCredsModal.collegeName} (${createdCredsModal.collegeIdentifier})\nAdmin Email: ${createdCredsModal.email}\nPassword: ${createdCredsModal.password}\nLogin URL: ${createdCredsModal.loginUrl}`;
+                      navigator.clipboard.writeText(text);
+                      setCopiedSummary(true);
+                      toast.success('All credentials copied to clipboard!');
+                      setTimeout(() => setCopiedSummary(false), 3000);
+                    }}
+                    className="flex-1 btn btn-primary btn-md gap-2 justify-center font-bold"
+                  >
+                    {copiedSummary ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                    <span>{copiedSummary ? 'Copied to Clipboard!' : 'Copy All Credentials'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCreatedCredsModal(null)}
+                    className="btn btn-secondary btn-md"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1859,339 +1759,6 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {/* ── Modal: Add New Department ── */}
-        {addDepartmentModalOpen && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setAddDepartmentModalOpen(false); }}>
-            <div className="modal-panel max-w-[500px]">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
-                    <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Department &amp; Registration Key</h3>
-                    <p className="text-[11px] text-slate-500">Create a department under a college and set its registration key</p>
-                  </div>
-                </div>
-                <button onClick={() => setAddDepartmentModalOpen(false)} className="btn-icon">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateDepartment} className="p-6 space-y-4">
-                <div>
-                  <label className="field-label">College / Institution <span className="text-rose-500">*</span></label>
-                  <select
-                    value={newDeptCollegeId}
-                    onChange={e => setNewDeptCollegeId(Number(e.target.value))}
-                    className="field-input text-xs"
-                    required
-                  >
-                    <option value="" disabled>Select parent college...</option>
-                    {nonDummyColleges.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.identifier})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="field-label">Department Name <span className="text-rose-500">*</span></label>
-                  <input
-                    type="text"
-                    value={newDeptName}
-                    onChange={e => setNewDeptName(e.target.value)}
-                    placeholder="e.g. Computer Science & Engineering"
-                    className="field-input"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="field-label">Registration Key <span className="text-rose-500">*</span></label>
-                  <input
-                    type="text"
-                    value={newDeptRegKey}
-                    onChange={e => setNewDeptRegKey(e.target.value)}
-                    placeholder="e.g. MITCSE2026 or CSE-MIT"
-                    className="field-input font-mono"
-                    required
-                  />
-                  <p className="field-helper mt-1 text-[11px]">
-                    Any identifier/invitation key. No minimum length or password complexity rules.
-                  </p>
-                </div>
-
-                <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-                  <button type="button" onClick={() => setAddDepartmentModalOpen(false)} className="btn btn-secondary btn-sm">
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={isSavingDept || !newDeptCollegeId || !newDeptName.trim() || !newDeptRegKey.trim()} className="btn btn-primary btn-sm gap-1.5">
-                    {isSavingDept ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    <span>Save Department</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ── Modal: Edit Department ── */}
-        {editDeptModal && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditDeptModal(null); }}>
-            <div className="modal-panel max-w-[500px]">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit Department &amp; Key</h3>
-                <button onClick={() => setEditDeptModal(null)} className="btn-icon">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleUpdateDepartment} className="p-6 space-y-4">
-                <div>
-                  <p className="text-xs text-slate-500">College: <strong className="text-slate-800 dark:text-slate-200">{editDeptModal.college?.name}</strong></p>
-                </div>
-
-                <div>
-                  <label className="field-label">Department Name <span className="text-rose-500">*</span></label>
-                  <input
-                    type="text"
-                    value={editDeptName}
-                    onChange={e => setEditDeptName(e.target.value)}
-                    className="field-input"
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                <div>
-                  <label className="field-label">Registration Key <span className="text-rose-500">*</span></label>
-                  <input
-                    type="text"
-                    value={editDeptRegKey}
-                    onChange={e => setEditDeptRegKey(e.target.value)}
-                    className="field-input font-mono"
-                    required
-                  />
-                  <p className="field-helper mt-1 text-[11px]">
-                    Changing the registration key only affects new registrations. Existing registered students remain permanently associated.
-                  </p>
-                </div>
-
-                <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-                  <button type="button" onClick={() => setEditDeptModal(null)} className="btn btn-secondary btn-sm">
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={isUpdatingDept || !editDeptName.trim() || !editDeptRegKey.trim()} className="btn btn-primary btn-sm gap-1.5">
-                    {isUpdatingDept ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    <span>Update Department</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ── Modal: Confirm Delete Department ── */}
-        {deleteDeptModal && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeleteDeptModal(null); }}>
-            <div className="modal-panel max-w-[420px]">
-              <div className="p-6 space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-
-                <div className="text-center space-y-1">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Delete Department?</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Are you sure you want to delete <span className="font-semibold text-slate-800 dark:text-slate-200">{deleteDeptModal.departmentName}</span>?
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-center gap-3 pt-2">
-                  <button type="button" onClick={() => setDeleteDeptModal(null)} className="btn btn-secondary btn-sm">
-                    Cancel
-                  </button>
-                  <button type="button" onClick={handleDeleteDepartment} disabled={isDeletingDept} className="btn btn-destructive btn-sm gap-1.5">
-                    {isDeletingDept ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                    <span>Confirm Delete</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Modal: Add New Admin ── */}
-        {addModalOpen && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setAddModalOpen(false); }}>
-            <div className="modal-panel max-w-[500px]">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                    <User className="w-4 h-4 text-slate-800 dark:text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add New School Admin Account</h3>
-                    <p className="text-[11px] text-slate-500">Assign an administrator to a college and department</p>
-                  </div>
-                </div>
-                <button onClick={() => setAddModalOpen(false)} className="btn-icon">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateAdmin} className="p-6 space-y-4">
-                <div>
-                  <label className="field-label">Admin Email Address <span className="text-rose-500">*</span></label>
-                  <input
-                    type="email"
-                    value={newEmail}
-                    onChange={e => setNewEmail(e.target.value)}
-                    placeholder="e.g. admin@mitwpu.edu.in or prof.sharma@gmail.com"
-                    className="field-input font-mono text-xs"
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                <div>
-                  <label className="field-label">Assigned College / School <span className="text-rose-500">*</span></label>
-                  <select
-                    value={newAdminCollegeId}
-                    onChange={e => {
-                      setNewAdminCollegeId(Number(e.target.value));
-                      setNewAdminDeptId('');
-                    }}
-                    className="field-input text-xs"
-                    required
-                  >
-                    <option value="" disabled>Select a configured college...</option>
-                    {nonDummyColleges.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.identifier})</option>
-                    ))}
-                  </select>
-                </div>
-
-                {newAdminCollegeId && (
-                  <div>
-                    <label className="field-label">Assigned Department (Optional)</label>
-                    <select
-                      value={newAdminDeptId}
-                      onChange={e => setNewAdminDeptId(e.target.value ? Number(e.target.value) : '')}
-                      className="field-input text-xs"
-                    >
-                      <option value="">All Departments (College-Wide)</option>
-                      {availableDeptsForNewAdmin.map(d => (
-                        <option key={d.id} value={d.id}>{d.departmentName} (Key: {d.registrationKey})</option>
-                      ))}
-                    </select>
-                    <p className="field-helper mt-1 text-[11px]">
-                      Leave as All Departments or scope this admin to a specific department.
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="field-label">Admin Full Name / Title (Optional)</label>
-                  <input
-                    type="text"
-                    value={newAdminName}
-                    onChange={e => setNewAdminName(e.target.value)}
-                    placeholder="e.g. Dr. Rajesh Sharma"
-                    className="field-input"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="field-label mb-0">Password <span className="text-rose-500">*</span></label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const gen = generateStrongPassword();
-                        setNewPassword(gen);
-                        setShowNewPassword(true);
-                      }}
-                      className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Sparkles className="w-3 h-3" /> Generate Strong
-                    </button>
-                  </div>
-
-                  <div className="relative">
-                    <input
-                      type={showNewPassword ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Enter password (min. 6 characters)..."
-                      className="field-input pr-10 font-mono text-xs"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                      tabIndex={-1}
-                    >
-                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  {newPassword.trim() && (
-                    <div className="mt-2 flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                      <span className="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate max-w-[280px]">
-                        {newEmail || 'email'} : {newPassword}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const col = nonDummyColleges.find(c => c.id === Number(newAdminCollegeId));
-                          navigator.clipboard.writeText(`College: ${col?.name || 'N/A'}\nEmail: ${newEmail || 'N/A'}\nPassword: ${newPassword}`);
-                          setCopiedNewCreds(true);
-                          toast.success('Credentials copied to clipboard!');
-                          setTimeout(() => setCopiedNewCreds(false), 2500);
-                        }}
-                        className="btn btn-secondary btn-xs gap-1"
-                      >
-                        {copiedNewCreds ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                        <span>{copiedNewCreds ? 'Copied' : 'Copy'}</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newActive}
-                      onChange={e => setNewActive(e.target.checked)}
-                      className="w-4 h-4 rounded text-slate-900 dark:text-slate-100 border-slate-300"
-                    />
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Active immediately
-                    </span>
-                  </label>
-
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setAddModalOpen(false)} className="btn btn-secondary btn-sm">
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSavingAdmin || !newEmail.trim() || !newAdminCollegeId || !newPassword.trim()}
-                      className="btn btn-primary btn-sm gap-1.5"
-                    >
-                      {isSavingAdmin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                      <span>Save Admin</span>
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
         {/* ── Modal: Reset Password ── */}
         {resetModalAdmin && (
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setResetModalAdmin(null); }}>
@@ -2222,7 +1789,7 @@ export default function SuperAdminDashboard() {
                         setResetPassword(gen);
                         setShowResetPassword(true);
                       }}
-                      className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <Sparkles className="w-3 h-3" /> Generate Strong
                     </button>

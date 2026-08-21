@@ -609,6 +609,41 @@ export const dataService = {
     }
   },
 
+  async findCollegeByIdentifier(identifier: string) {
+    const cleanIdentifier = identifier.trim().toUpperCase();
+    if (!cleanIdentifier) return null;
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data: college, error } = await supabase
+          .from('colleges')
+          .select('id, name, identifier, createdAt, updatedAt')
+          .eq('identifier', cleanIdentifier)
+          .maybeSingle();
+
+        if (!error && college) {
+          const { data: depts } = await supabase
+            .from('college_departments')
+            .select('id, collegeId, departmentName, registrationKey')
+            .eq('collegeId', college.id);
+          return { ...college, departments: depts || [] };
+        }
+      } catch (err) {
+        console.warn('Supabase findCollegeByIdentifier error:', err);
+      }
+    }
+
+    try {
+      return await db.college.findUnique({
+        where: { identifier: cleanIdentifier },
+        include: { departments: true },
+      });
+    } catch (dbErr) {
+      console.error('Prisma findCollegeByIdentifier failed:', dbErr);
+      return null;
+    }
+  },
+
   async createCollege(data: { name: string; identifier: string }) {
     const normName = normalizeCollegeName(data.name);
     const cleanIdentifier = data.identifier.trim().toUpperCase();

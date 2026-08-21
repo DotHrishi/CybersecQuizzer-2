@@ -125,6 +125,8 @@ export const AdminCreateSchema = z.object({
   name: z.string().trim().optional(),
   password: z.string().min(6, 'Password must be at least 6 characters long.'),
   collegeId: z.coerce.number().int().positive('Please select a valid college.').optional(),
+  collegeName: z.string().trim().min(2, 'College name must be at least 2 characters long.').max(150).optional(),
+  collegeIdentifier: z.string().trim().min(2, 'College identifier must be at least 2 characters.').max(50).optional(),
   collegeDepartmentId: z.coerce.number().int().positive('Please select a valid department.').optional(),
   active: z.boolean().default(true),
 });
