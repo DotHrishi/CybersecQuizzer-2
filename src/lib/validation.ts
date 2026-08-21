@@ -23,7 +23,6 @@ export const QuizSubmissionSchema = z.object({
 
 // Question Bank CRUD validation
 export const QuestionSchema = z.object({
-  scenario: z.string().trim().optional().nullable(),
   questionText: z.string().trim().min(10, 'Question text must be at least 10 characters long.'),
   optionA: z.string().trim().min(1, 'Option A is required.'),
   optionB: z.string().trim().min(1, 'Option B is required.'),

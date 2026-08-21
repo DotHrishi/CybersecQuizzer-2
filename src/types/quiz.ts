@@ -3,7 +3,6 @@ export type OptionKey = 'A' | 'B' | 'C' | 'D';
 export interface QuestionClientDTO {
   sessionId: string;
   sessionToken?: string; // Signed stateless token for serverless fallback
-  scenario?: string | null; // Optional situational / context background
   questionText: string;
   options: {
     A: string;
@@ -92,3 +91,4 @@ export interface UserReportStats {
     category?: string;
   }[];
 }
+

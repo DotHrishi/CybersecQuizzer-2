@@ -11,30 +11,6 @@ function hashPassword(password: string): string {
 
 const sampleQuestions = [
   {
-    scenario: 'Rahul works as a system administrator and needs to set a master password for a secure server. He wants to pick the option that provides the highest possible resistance against modern cracking tools.',
-    questionText: 'Which of the following employee passwords meets this requirement?',
-    optionA: 'Password123!',
-    optionB: 'Admin@2026',
-    optionC: 'correct-horse-battery-staple-9#Z',
-    optionD: 'P@$$w0rd',
-    correctOption: 'C',
-    category: 'Password Security',
-    difficulty: 'Medium',
-    active: true,
-  },
-  {
-    scenario: 'An employee in the finance department receives an urgent email claiming to be from the CEO asking to immediately wire $50,000 to an overseas supplier before the end of the day. The sender address is spoofed to look like ceo@company-corp.com.',
-    questionText: 'What specific type of targeted social engineering attack is taking place here?',
-    optionA: 'Watering Hole Attack',
-    optionB: 'Business Email Compromise (BEC) / Spear Phishing',
-    optionC: 'DNS Cache Poisoning',
-    optionD: 'Cross-Site Scripting (XSS)',
-    correctOption: 'B',
-    category: 'Social Engineering',
-    difficulty: 'Medium',
-    active: true,
-  },
-  {
     questionText: 'Which social engineering attack tricks victims into clicking malicious links via SMS text messages?',
     optionA: 'Phishing',
     optionB: 'Smishing',

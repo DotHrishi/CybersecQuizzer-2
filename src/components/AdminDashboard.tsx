@@ -12,7 +12,7 @@ import {
   Trophy, Clock, Target, TrendingUp, Hash, ChevronsUpDown, Award,
   ShieldAlert, Layers, CalendarDays, Flame,
   AlertOctagon, CheckCircle, XCircle, TrendingDown,
-  Mail, LogOut, Key, User, Building2, Check, Copy, KeyRound, Edit3, Play,
+  Mail, LogOut, Key, User, Building2, Check, Copy, KeyRound, Edit3,
 } from 'lucide-react';
 
 
@@ -20,9 +20,7 @@ import toast from 'react-hot-toast';
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface Question {
-  id: number;
-  scenario?: string | null;
-  questionText: string;
+  id: number; questionText: string;
   optionA: string; optionB: string; optionC: string; optionD: string;
   correctOption: string; category: string; difficulty: string;
   active: boolean; createdAt: string; updatedAt?: string;
@@ -45,7 +43,6 @@ type FilterDifficulty = 'All' | 'Easy' | 'Medium' | 'Hard';
 type FilterStatus = 'All' | 'Active' | 'Disabled';
 
 const defaultForm = {
-  scenario: '',
   questionText: '',
   optionA: '', optionB: '', optionC: '', optionD: '',
   correctOption: 'A' as 'A'|'B'|'C'|'D',
@@ -82,15 +79,7 @@ function DiffBadge({ d }: { d: string }) {
 function ExpandedRow({ q }: { q: Question }) {
   return (
     <tr className="bg-slate-50/80 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-700">
-      <td colSpan={8} className="px-4 py-4 space-y-3">
-        {q.scenario && (
-          <div className="p-3 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs">
-            <span className="font-extrabold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider text-[10px] block mb-1">
-              Case Scenario:
-            </span>
-            <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{q.scenario}</p>
-          </div>
-        )}
+      <td colSpan={8} className="px-4 py-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           {(['A','B','C','D'] as const).map(opt => (
             <div key={opt} className={`p-3 rounded-lg border ${q.correctOption === opt ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' : 'card-sunken'}`}>
@@ -102,7 +91,7 @@ function ExpandedRow({ q }: { q: Question }) {
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-slate-400 mt-1">
+        <p className="text-[11px] text-slate-400 mt-3">
           Created: {new Date(q.createdAt).toLocaleString()}
           {q.updatedAt && ` · Updated: ${new Date(q.updatedAt).toLocaleString()}`}
         </p>
@@ -217,21 +206,8 @@ function QuestionModal({ editingId, formData, setFormData, onSave, onClose, savi
         </div>
         <form onSubmit={onSave} className="p-6 space-y-4">
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="field-label mb-0">Case Scenario / Context <span className="text-slate-400 font-normal">(Optional)</span></label>
-              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">Boxed separately above question</span>
-            </div>
-            <textarea
-              rows={3}
-              value={formData.scenario || ''}
-              onChange={e => setFormData(f => ({ ...f, scenario: e.target.value }))}
-              placeholder="e.g. Rahul works as a system administrator and needs to set a master password for a secure server..."
-              className="field-input resize-none text-xs"
-            />
-          </div>
-          <div>
             <label className="field-label">Question Text <span className="text-rose-500">*</span></label>
-            <textarea rows={2} value={formData.questionText} onChange={e => setFormData(f => ({ ...f, questionText: e.target.value }))} placeholder="e.g. Which of the following employee passwords meets this requirement?" className="field-input resize-none" required />
+            <textarea rows={3} value={formData.questionText} onChange={e => setFormData(f => ({ ...f, questionText: e.target.value }))} placeholder="Enter the full question text..." className="field-input resize-none" required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             {(['A','B','C','D'] as const).map(opt => (
@@ -278,167 +254,6 @@ function QuestionModal({ editingId, formData, setFormData, onSave, onClose, savi
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Question Preview & Test Modal ───────────────────────── */
-function QuestionPreviewModal({ question, onClose }: { question: Question; onClose: () => void }) {
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [tested, setTested] = useState(false);
-
-  const isCorrect = selectedOption === question.correctOption;
-
-  return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-panel max-w-[620px]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/60 flex items-center justify-center">
-              <Play className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 fill-indigo-600 dark:fill-indigo-400" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Preview & Test Attempt
-              </h3>
-              <p className="text-[11px] text-slate-400">Interactive live question simulation</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="btn-icon"><X className="w-4 h-4" /></button>
-        </div>
-
-        <div className="p-6 space-y-5">
-          {/* Metadata badges */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="badge badge-slate uppercase tracking-wider text-[11px]">
-                <ShieldCheck className="w-3 h-3" />
-                {question.category}
-              </span>
-              <DiffBadge d={question.difficulty} />
-            </div>
-            <span className="text-[11px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-              Question #{question.id}
-            </span>
-          </div>
-
-          {/* Scenario Box if present */}
-          {question.scenario && question.scenario.trim().length > 0 && (
-            <div className="rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-indigo-50/30 to-blue-50/40 dark:from-indigo-950/40 dark:via-slate-900/80 dark:to-blue-950/30 p-4 sm:p-5 shadow-xs">
-              <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 mb-2">
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Case Scenario / Context</span>
-              </div>
-              <p className="text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-relaxed font-normal">
-                {question.scenario}
-              </p>
-            </div>
-          )}
-
-          {/* Question Text */}
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">Question</p>
-            <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed">
-              {question.questionText}
-            </h4>
-          </div>
-
-          {/* Options */}
-          <div className="space-y-2.5">
-            {(['A', 'B', 'C', 'D'] as const).map(opt => {
-              const optText = question[`option${opt}` as 'optionA' | 'optionB' | 'optionC' | 'optionD'];
-              const isSelected = selectedOption === opt;
-              const isOptionCorrect = opt === question.correctOption;
-
-              let borderBg = 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600';
-              if (tested) {
-                if (isOptionCorrect) {
-                  borderBg = 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-600 shadow-sm';
-                } else if (isSelected && !isOptionCorrect) {
-                  borderBg = 'bg-rose-50 dark:bg-rose-950/40 border-rose-500 dark:border-rose-600 shadow-sm';
-                }
-              } else if (isSelected) {
-                borderBg = 'bg-slate-50 dark:bg-slate-800 border-[#0f172a] dark:border-white shadow-sm';
-              }
-
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => { setSelectedOption(opt); setTested(false); }}
-                  className={`w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-center justify-between group cursor-pointer ${borderBg}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
-                      tested && isOptionCorrect
-                        ? 'bg-emerald-600 text-white'
-                        : tested && isSelected && !isOptionCorrect
-                        ? 'bg-rose-600 text-white'
-                        : isSelected
-                        ? 'bg-[#0f172a] text-white dark:bg-white dark:text-slate-900'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-700'
-                    }`}>
-                      {opt}
-                    </span>
-                    <span className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 leading-snug">
-                      {optText}
-                    </span>
-                  </div>
-                  {tested && isOptionCorrect && (
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 shrink-0 ml-2">
-                      <Check className="w-4 h-4" /> Correct Answer
-                    </span>
-                  )}
-                  {tested && isSelected && !isOptionCorrect && (
-                    <span className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 shrink-0 ml-2">
-                      <X className="w-4 h-4" /> Selected (Wrong)
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Test Submit / Results */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-            <div>
-              {tested ? (
-                <p className={`text-xs font-bold flex items-center gap-1.5 ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                  {isCorrect ? '🎉 Correct answer verified!' : `❌ Incorrect. Option ${question.correctOption} is correct.`}
-                </p>
-              ) : (
-                <p className="text-xs text-slate-400">
-                  Select an option to test your answer.
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!selectedOption) {
-                    toast.error('Please select an option first.');
-                    return;
-                  }
-                  setTested(true);
-                }}
-                disabled={!selectedOption}
-                className="btn btn-primary btn-sm px-4 gap-1.5"
-              >
-                <Check className="w-3.5 h-3.5" />
-                Check Answer
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn btn-secondary btn-sm"
-              >
-                Close Preview
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -1320,16 +1135,7 @@ function QuestionBankReport({ questions }: { questions: Question[] }) {
                 : filtered.map(q => (
                   <tr key={q.id} className={`table-row ${!q.active ? 'opacity-50' : ''}`}>
                     <td className="table-td font-mono text-slate-400 text-[11px]">#{q.id}</td>
-                    <td className="table-td max-w-xs">
-                      <div className="space-y-1">
-                        {q.scenario && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
-                            Scenario
-                          </span>
-                        )}
-                        <span className="line-clamp-2 text-xs text-slate-800 dark:text-slate-200 block">{q.questionText}</span>
-                      </div>
-                    </td>
+                    <td className="table-td max-w-xs"><span className="line-clamp-2 text-xs text-slate-800 dark:text-slate-200">{q.questionText}</span></td>
                     <td className="table-td"><span className="badge badge-slate">{q.category}</span></td>
                     <td className="table-td"><DiffBadge d={q.difficulty} /></td>
                     <td className="table-td text-center font-bold text-slate-900 dark:text-white">{q.correctOption}</td>
@@ -1989,7 +1795,6 @@ export default function AdminDashboard() {
   const [formData, setFormData]               = useState({ ...defaultForm });
   const [formSaving, setFormSaving]           = useState(false);
   const [deleteTarget, setDeleteTarget]       = useState<{ id: number; questionText: string } | null>(null);
-  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
 
   /* Bulk */
   const [bulkOpen, setBulkOpen]               = useState(false);
@@ -2198,18 +2003,7 @@ export default function AdminDashboard() {
   const openAddModal  = () => { setEditingId(null); setFormData({ ...defaultForm }); setModalOpen(true); };
   const openEditModal = (q: Question) => {
     setEditingId(q.id);
-    setFormData({
-      scenario: q.scenario || '',
-      questionText: q.questionText,
-      optionA: q.optionA,
-      optionB: q.optionB,
-      optionC: q.optionC,
-      optionD: q.optionD,
-      correctOption: q.correctOption as any,
-      category: q.category,
-      difficulty: q.difficulty as any,
-      active: q.active,
-    });
+    setFormData({ questionText: q.questionText, optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD, correctOption: q.correctOption as any, category: q.category, difficulty: q.difficulty as any, active: q.active });
     setModalOpen(true); setMenuOpenId(null);
   };
 
@@ -2614,14 +2408,7 @@ export default function AdminDashboard() {
                               <button onClick={() => setExpandedId(expandedId === q.id ? null : q.id)} className="mt-0.5 btn-icon w-4 h-4 shrink-0 text-slate-300 hover:text-slate-600 dark:hover:text-slate-200">
                                 {expandedId === q.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                               </button>
-                              <div className="space-y-1">
-                                {q.scenario && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
-                                    Scenario
-                                  </span>
-                                )}
-                                <span className="font-medium text-slate-900 dark:text-white line-clamp-2 text-xs leading-snug block">{q.questionText}</span>
-                              </div>
+                              <span className="font-medium text-slate-900 dark:text-white line-clamp-2 text-xs leading-snug">{q.questionText}</span>
                             </div>
                           </td>
                           <td className="table-td"><span className="badge badge-slate">{q.category}</span></td>
@@ -2634,13 +2421,11 @@ export default function AdminDashboard() {
                           </td>
                           <td className="table-td text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <button onClick={() => setPreviewQuestion(q)} className="btn-icon text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40" title="Test & Preview Question"><Play className="w-3.5 h-3.5 fill-indigo-600 dark:fill-indigo-400" /></button>
                               <button onClick={() => openEditModal(q)} className="btn-icon" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>
                               <div className="relative" ref={menuOpenId === q.id ? menuRef : undefined}>
                                 <button onClick={() => setMenuOpenId(menuOpenId === q.id ? null : q.id)} className="btn-icon" title="More"><MoreVertical className="w-3.5 h-3.5" /></button>
                                 {menuOpenId === q.id && (
                                   <div className="absolute right-0 top-full mt-1 z-30 card-raised rounded-xl py-1.5 min-w-[160px]">
-                                    <button onClick={() => { setPreviewQuestion(q); setMenuOpenId(null); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"><Play className="w-3.5 h-3.5 fill-indigo-600 dark:fill-indigo-400" />Test / Preview</button>
                                     <button onClick={() => openEditModal(q)} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"><Edit2 className="w-3.5 h-3.5 text-slate-400" />Edit</button>
                                     <button onClick={() => handleToggleActive(q)} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                       {q.active ? <EyeOff className="w-3.5 h-3.5 text-slate-400" /> : <Eye className="w-3.5 h-3.5 text-slate-400" />}{q.active ? 'Disable' : 'Enable'}
@@ -2776,14 +2561,6 @@ export default function AdminDashboard() {
           </form>
         </div>
       </div>
-    )}
-
-    {/* ── Question Test & Preview Modal ── */}
-    {previewQuestion && (
-      <QuestionPreviewModal
-        question={previewQuestion}
-        onClose={() => setPreviewQuestion(null)}
-      />
     )}
     </>
   );
