@@ -270,3 +270,46 @@ export async function PUT(req: NextRequest) {
     );
   }
 }
+
+// PATCH: Update College Identifier Code by the college admin
+export async function PATCH(req: NextRequest) {
+  const auth = await verifyAdminRequest(req);
+  if (!auth.isAuth || !auth.admin) {
+    return NextResponse.json({ success: false, message: 'Unauthorized admin access.' }, { status: 401 });
+  }
+
+  const { admin } = auth;
+  const targetCollegeId = admin.collegeId || (admin.collegeDepartmentId && admin.college?.id ? admin.college.id : null);
+
+  if (!targetCollegeId && !admin.isSuperAdmin) {
+    return NextResponse.json({ success: false, message: 'Forbidden: No assigned college found for your account.' }, { status: 403 });
+  }
+
+  try {
+    const body = await req.json();
+    const { identifier } = body;
+
+    if (!identifier || typeof identifier !== 'string' || identifier.trim().length < 2) {
+      return NextResponse.json({ success: false, message: 'Identifier code must be at least 2 characters.' }, { status: 400 });
+    }
+
+    const cleanIdent = identifier.trim().toUpperCase().replace(/\s+/g, '-');
+
+    // Check uniqueness
+    const existing = await dataService.findCollegeByIdentifier(cleanIdent);
+    if (existing && existing.id !== targetCollegeId) {
+      return NextResponse.json({ success: false, message: `Identifier "${cleanIdent}" is already in use by another college.` }, { status: 400 });
+    }
+
+    const updated = await dataService.updateCollege(targetCollegeId!, { identifier: cleanIdent });
+
+    return NextResponse.json({
+      success: true,
+      message: `College identifier updated to "${cleanIdent}" successfully!`,
+      college: updated,
+    });
+  } catch (err: any) {
+    console.error('Error updating college identifier:', err);
+    return NextResponse.json({ success: false, message: err.message || 'Failed to update college identifier.' }, { status: 500 });
+  }
+}

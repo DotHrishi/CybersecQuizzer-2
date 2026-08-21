@@ -579,15 +579,13 @@ export default function SuperAdminDashboard() {
   /* ── Create Admin & College in Combined Single Step ── */
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCollegeName.trim() || !newCollegeIdentifier.trim() || !newEmail.trim() || !newPassword.trim()) {
-      toast.error('College Name, Identifier Code, Admin Email, and Password are all required.');
+    if (!newCollegeName.trim() || !newEmail.trim() || !newPassword.trim()) {
+      toast.error('College Name, Admin Email, and Password are all required.');
       return;
     }
 
     const existingCollege = nonDummyColleges.find(
-      c =>
-        c.name.toLowerCase() === newCollegeName.trim().toLowerCase() ||
-        c.identifier.toLowerCase() === newCollegeIdentifier.trim().toLowerCase()
+      c => c.name.toLowerCase() === newCollegeName.trim().toLowerCase()
     );
     if (existingCollege) {
       const existingAdminForCol = admins.find(a => a.collegeId === existingCollege.id);
@@ -607,7 +605,6 @@ export default function SuperAdminDashboard() {
         },
         body: JSON.stringify({
           collegeName: newCollegeName.trim(),
-          collegeIdentifier: newCollegeIdentifier.trim().toUpperCase(),
           email: newEmail.trim().toLowerCase(),
           name: newAdminName.trim() || undefined,
           password: newPassword,
@@ -621,7 +618,7 @@ export default function SuperAdminDashboard() {
         setAddModalOpen(false);
         setCreatedCredsModal({
           collegeName: data.admin?.college?.name || newCollegeName.trim(),
-          collegeIdentifier: data.admin?.college?.identifier || newCollegeIdentifier.trim().toUpperCase(),
+          collegeIdentifier: data.admin?.college?.identifier || '',
           email: newEmail.trim().toLowerCase(),
           password: newPassword,
           name: newAdminName.trim() || undefined,
@@ -1495,11 +1492,7 @@ export default function SuperAdminDashboard() {
                     <input
                       type="text"
                       value={newCollegeName}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setNewCollegeName(val);
-                        setNewCollegeIdentifier(generateIdentifier(val));
-                      }}
+                      onChange={e => setNewCollegeName(e.target.value)}
                       placeholder="e.g. MIT - WPU University Pune"
                       className="field-input"
                       required
@@ -1507,22 +1500,7 @@ export default function SuperAdminDashboard() {
                       autoComplete="off"
                     />
                     <p className="field-helper mt-1 text-[11px]">
-                      This is the official institution name.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="field-label">Unique Identifier Code <span className="text-rose-500">*</span></label>
-                    <input
-                      type="text"
-                      value={newCollegeIdentifier}
-                      onChange={e => setNewCollegeIdentifier(e.target.value.toUpperCase().replace(/\s+/g, '-'))}
-                      placeholder="E.G. MITWPU-PUNE"
-                      className="field-input font-mono uppercase"
-                      required
-                    />
-                    <p className="field-helper mt-1 text-[11px]">
-                      Short code for reports and certificate serializing.
+                      This is the official institution name. Unique identifier code &amp; keys are configured by the college admin.
                     </p>
                   </div>
                 </div>
@@ -1608,7 +1586,7 @@ export default function SuperAdminDashboard() {
                     </button>
                     <button
                       type="submit"
-                      disabled={isSavingAdmin || !newCollegeName.trim() || !newCollegeIdentifier.trim() || !newEmail.trim() || !newPassword.trim()}
+                      disabled={isSavingAdmin || !newCollegeName.trim() || !newEmail.trim() || !newPassword.trim()}
                       className="btn btn-primary btn-sm gap-1.5 shadow-sm font-bold"
                     >
                       {isSavingAdmin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}

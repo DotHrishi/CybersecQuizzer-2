@@ -1777,6 +1777,11 @@ export default function AdminDashboard() {
   const [newDeptKey, setNewDeptKey]           = useState('');
   const [isCreatingDept, setIsCreatingDept]   = useState(false);
 
+  /* College Identifier update modal */
+  const [isEditCollegeIdentModalOpen, setIsEditCollegeIdentModalOpen] = useState(false);
+  const [newCollegeIdentInput, setNewCollegeIdentInput] = useState('');
+  const [isUpdatingCollegeIdent, setIsUpdatingCollegeIdent] = useState(false);
+
   /* Tab state */
   const [adminTab, setAdminTab]               = useState<AdminTab>('questions');
   const [reportTab, setReportTab]             = useState<ReportTab>('overview');
@@ -2064,6 +2069,42 @@ export default function AdminDashboard() {
       toast.error('Network error creating department.');
     } finally {
       setIsCreatingDept(false);
+    }
+  };
+
+  const handleUpdateCollegeIdentifier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCollegeIdentInput.trim()) {
+      toast.error('Identifier code cannot be empty.');
+      return;
+    }
+
+    setIsUpdatingCollegeIdent(true);
+    try {
+      const res = await fetch('/api/admin/registration-key', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': adminToken || '',
+          'x-admin-password': adminToken || '',
+        },
+        body: JSON.stringify({
+          identifier: newCollegeIdentInput.trim().toUpperCase(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.college) {
+        setAdminCollege(data.college);
+        sessionStorage.setItem(ADMIN_COLLEGE_STORAGE_KEY, JSON.stringify(data.college));
+        setIsEditCollegeIdentModalOpen(false);
+        toast.success(data.message || 'College identifier updated successfully!');
+      } else {
+        toast.error(data.message || 'Failed to update college identifier.');
+      }
+    } catch {
+      toast.error('Network error updating college identifier.');
+    } finally {
+      setIsUpdatingCollegeIdent(false);
     }
   };
 
@@ -2459,6 +2500,36 @@ export default function AdminDashboard() {
             >
               <Plus className="w-3.5 h-3.5" />
               <span>+ Add Department &amp; Key</span>
+            </button>
+          </div>
+
+          {/* College Info & Unique Identifier Code Bar */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Official College:</span>
+                <strong className="text-sm font-bold text-slate-900 dark:text-white">{adminCollege?.name || 'Assigned College'}</strong>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Unique Identifier Code:</span>
+                <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  {adminCollege?.identifier || 'NOT SET'}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  (Used for certificates &amp; institutional reporting)
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setNewCollegeIdentInput(adminCollege?.identifier || '');
+                setIsEditCollegeIdentModalOpen(true);
+              }}
+              className="btn btn-secondary btn-xs gap-1.5 font-bold shrink-0"
+            >
+              <Edit3 className="w-3 h-3" />
+              <span>Edit Identifier Code</span>
             </button>
           </div>
 
@@ -2929,6 +3000,68 @@ export default function AdminDashboard() {
               >
                 {isCreatingDept ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 <span>Create Department</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {/* Edit College Identifier Modal */}
+    {isEditCollegeIdentModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit College Identifier Code</h3>
+            </div>
+            <button onClick={() => setIsEditCollegeIdentModalOpen(false)} className="btn-icon">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleUpdateCollegeIdentifier} className="p-5 space-y-4">
+            <div>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                College: <strong className="text-slate-900 dark:text-white">{adminCollege?.name || 'Your Assigned College'}</strong>
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="collegeIdentInput" className="field-label">
+                Unique Identifier Code <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="collegeIdentInput"
+                type="text"
+                value={newCollegeIdentInput}
+                onChange={e => setNewCollegeIdentInput(e.target.value.toUpperCase().replace(/\s+/g, '-'))}
+                placeholder="e.g. MITWPU-PUNE or COEP-TECH"
+                className="field-input font-mono uppercase"
+                autoFocus
+                required
+              />
+              <p className="field-helper text-[11px] mt-1">
+                Short unique code used for reports, certificates, and student affiliation tracking.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsEditCollegeIdentModalOpen(false)}
+                className="btn btn-secondary btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isUpdatingCollegeIdent || !newCollegeIdentInput.trim()}
+                className="btn btn-primary btn-sm gap-1.5"
+              >
+                {isUpdatingCollegeIdent ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Save Identifier</span>
               </button>
             </div>
           </form>

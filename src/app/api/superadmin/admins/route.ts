@@ -58,23 +58,39 @@ export async function POST(req: NextRequest) {
     let targetCollegeId = collegeId;
     let targetDepartmentName: string | undefined;
 
-    // Handle combined form: if collegeName / collegeIdentifier are provided, find or create the college
+    // Handle combined form: if collegeName is provided, find or create the college
     if (!targetCollegeId && (collegeName || collegeIdentifier)) {
-      const cleanIdent = (collegeIdentifier || collegeName || '').trim().toUpperCase();
-      const cleanColName = (collegeName || collegeIdentifier || '').trim();
+      const cleanColName = (collegeName || '').trim();
+      let cleanIdent = (collegeIdentifier || '').trim().toUpperCase();
 
-      // Check if college exists by identifier or name
-      let foundCollege = cleanIdent ? await dataService.findCollegeByIdentifier(cleanIdent) : null;
-      if (!foundCollege && cleanColName) {
-        foundCollege = await dataService.findCollegeByName(cleanColName);
+      if (!cleanIdent && cleanColName) {
+        const words = cleanColName.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+        if (words.length === 1) {
+          cleanIdent = words[0].slice(0, 10).toUpperCase();
+        } else {
+          cleanIdent = words.map(w => w[0]).join('').slice(0, 8).toUpperCase();
+        }
+      }
+
+      // Check if college exists by name or identifier
+      let foundCollege = cleanColName ? await dataService.findCollegeByName(cleanColName) : null;
+      if (!foundCollege && cleanIdent) {
+        foundCollege = await dataService.findCollegeByIdentifier(cleanIdent);
       }
 
       if (foundCollege) {
         targetCollegeId = foundCollege.id;
       } else {
+        // Ensure identifier uniqueness
+        let finalIdent = cleanIdent || `COL-${Date.now().toString().slice(-4)}`;
+        const existingIdent = await dataService.findCollegeByIdentifier(finalIdent);
+        if (existingIdent) {
+          finalIdent = `${finalIdent}-${Date.now().toString().slice(-4)}`;
+        }
+
         const createdCollege = await dataService.createCollege({
           name: cleanColName,
-          identifier: cleanIdent,
+          identifier: finalIdent,
         });
         targetCollegeId = createdCollege.id;
       }
