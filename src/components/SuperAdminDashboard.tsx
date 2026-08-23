@@ -575,6 +575,18 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  /* ── Form Reset Helper ── */
+  const resetAdminForm = () => {
+    setNewCollegeName('');
+    setNewDepartmentName('');
+    setNewEmail('');
+    setNewAdminName('');
+    setNewPassword('');
+    setNewActive(true);
+    setShowNewPassword(false);
+    setCopiedNewCreds(false);
+  };
+
   /* ── Create Admin, College & Department in Combined Single Step ── */
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -613,12 +625,7 @@ export default function SuperAdminDashboard() {
           name: newAdminName.trim() || undefined,
           loginUrl: `${window.location.origin}/admin`,
         });
-        setNewCollegeName('');
-        setNewDepartmentName('');
-        setNewEmail('');
-        setNewAdminName('');
-        setNewPassword('');
-        setNewActive(true);
+        resetAdminForm();
         fetchAdmins();
         fetchColleges();
         fetchDepartments();
@@ -946,17 +953,7 @@ export default function SuperAdminDashboard() {
 
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => {
-                setNewCollegeName('');
-                setNewCollegeIdentifier('');
-                setNewEmail('');
-                setNewAdminName('');
-                setNewPassword('');
-                setNewActive(true);
-                setCopiedNewCreds(false);
-                setShowNewPassword(false);
-                setAddModalOpen(true);
-              }}
+              onClick={() => setAddModalOpen(true)}
               className="btn btn-primary btn-md gap-2 shadow-md font-bold"
             >
               <UserPlus className="w-4 h-4" />
@@ -1406,7 +1403,7 @@ export default function SuperAdminDashboard() {
 
         {/* ── Modal: Unified Add New College Admin (All-In-One Form) ── */}
         {addModalOpen && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setAddModalOpen(false); }}>
+          <div className="modal-overlay">
             <div className="modal-panel max-w-[540px]">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
                 <div className="flex items-center gap-2.5">
@@ -1418,17 +1415,24 @@ export default function SuperAdminDashboard() {
                     <p className="text-[11px] text-slate-500">Provision institution, department, and administrator credentials in one step</p>
                   </div>
                 </div>
-                <button onClick={() => setAddModalOpen(false)} className="btn-icon">
+                <button
+                  type="button"
+                  onClick={() => setAddModalOpen(false)}
+                  className="btn-icon"
+                  title="Close dialog"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateAdmin} className="p-6 space-y-4">
+              <form onSubmit={handleCreateAdmin} className="p-6 space-y-4" autoComplete="off">
                 {/* ── Section 1: Institution & Department Details ── */}
                 <div className="space-y-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                   <div>
-                    <label className="field-label">Official College Name <span className="text-rose-500">*</span></label>
+                    <label htmlFor="create-admin-college" className="field-label">Official College Name <span className="text-rose-500">*</span></label>
                     <input
+                      id="create-admin-college"
+                      name="collegeName"
                       type="text"
                       list="superadmin-existing-colleges-list"
                       value={newCollegeName}
@@ -1450,8 +1454,10 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="field-label">Department Name <span className="text-rose-500">*</span></label>
+                    <label htmlFor="create-admin-dept" className="field-label">Department Name <span className="text-rose-500">*</span></label>
                     <input
+                      id="create-admin-dept"
+                      name="departmentName"
                       type="text"
                       value={newDepartmentName}
                       onChange={e => setNewDepartmentName(e.target.value)}
@@ -1469,31 +1475,37 @@ export default function SuperAdminDashboard() {
                 {/* ── Section 2: Admin Account Credentials ── */}
                 <div className="space-y-3">
                   <div>
-                    <label className="field-label">Admin Email Address <span className="text-rose-500">*</span></label>
+                    <label htmlFor="create-admin-email" className="field-label">Admin Email Address <span className="text-rose-500">*</span></label>
                     <input
+                      id="create-admin-email"
+                      name="adminEmail"
                       type="email"
                       value={newEmail}
                       onChange={e => setNewEmail(e.target.value)}
                       placeholder="e.g. Kali@mitwpu or jain@mitwpu"
                       className="field-input font-mono text-xs"
+                      autoComplete="off"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="field-label">Admin Full Name / Title (Optional)</label>
+                    <label htmlFor="create-admin-name" className="field-label">Admin Full Name / Title (Optional)</label>
                     <input
+                      id="create-admin-name"
+                      name="adminFullName"
                       type="text"
                       value={newAdminName}
                       onChange={e => setNewAdminName(e.target.value)}
                       placeholder="e.g. Hrishikesh Kali or Dr. Jain"
                       className="field-input"
+                      autoComplete="off"
                     />
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="field-label mb-0">Password <span className="text-rose-500">*</span></label>
+                      <label htmlFor="create-admin-password" className="field-label mb-0">Password <span className="text-rose-500">*</span></label>
                       <button
                         type="button"
                         onClick={() => {
@@ -1509,11 +1521,14 @@ export default function SuperAdminDashboard() {
 
                     <div className="relative">
                       <input
+                        id="create-admin-password"
+                        name="adminPassword"
                         type={showNewPassword ? 'text' : 'password'}
                         value={newPassword}
                         onChange={e => setNewPassword(e.target.value)}
                         placeholder="Enter password (min. 6 characters)..."
                         className="field-input pr-10 font-mono text-xs"
+                        autoComplete="new-password"
                         required
                       />
                       <button
@@ -1542,7 +1557,14 @@ export default function SuperAdminDashboard() {
                   </label>
 
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setAddModalOpen(false)} className="btn btn-secondary btn-sm">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddModalOpen(false);
+                        resetAdminForm();
+                      }}
+                      className="btn btn-secondary btn-sm"
+                    >
                       Cancel
                     </button>
                     <button
@@ -1624,19 +1646,26 @@ export default function SuperAdminDashboard() {
 
         {/* ── Modal: Edit College ── */}
         {editCollegeModal && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditCollegeModal(null); }}>
+          <div className="modal-overlay">
             <div className="modal-panel max-w-[500px]">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit College</h3>
-                <button onClick={() => setEditCollegeModal(null)} className="btn-icon">
+                <button
+                  type="button"
+                  onClick={() => setEditCollegeModal(null)}
+                  className="btn-icon"
+                  title="Close dialog"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleUpdateCollege} className="p-6 space-y-4">
+              <form onSubmit={handleUpdateCollege} className="p-6 space-y-4" autoComplete="off">
                 <div>
-                  <label className="field-label">Official College Name <span className="text-rose-500">*</span></label>
+                  <label htmlFor="edit-college-name" className="field-label">Official College Name <span className="text-rose-500">*</span></label>
                   <input
+                    id="edit-college-name"
+                    name="collegeName"
                     type="text"
                     value={editCollegeName}
                     onChange={e => setEditCollegeName(e.target.value)}
@@ -1647,8 +1676,10 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="field-label">Identifier Code <span className="text-rose-500">*</span></label>
+                  <label htmlFor="edit-college-identifier" className="field-label">Identifier Code <span className="text-rose-500">*</span></label>
                   <input
+                    id="edit-college-identifier"
+                    name="collegeIdentifier"
                     type="text"
                     value={editCollegeIdentifier}
                     onChange={e => setEditCollegeIdentifier(e.target.value.toUpperCase())}
@@ -1673,7 +1704,7 @@ export default function SuperAdminDashboard() {
 
         {/* ── Modal: Confirm Delete College ── */}
         {deleteCollegeModal && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeleteCollegeModal(null); }}>
+          <div className="modal-overlay">
             <div className="modal-panel max-w-[420px]">
               <div className="p-6 space-y-4">
                 <div className="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400">
@@ -1703,16 +1734,21 @@ export default function SuperAdminDashboard() {
 
         {/* ── Modal: Reset Password ── */}
         {resetModalAdmin && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setResetModalAdmin(null); }}>
+          <div className="modal-overlay">
             <div className="modal-panel max-w-[440px]">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reset Admin Password</h3>
-                <button onClick={() => setResetModalAdmin(null)} className="btn-icon">
+                <button
+                  type="button"
+                  onClick={() => setResetModalAdmin(null)}
+                  className="btn-icon"
+                  title="Close dialog"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleResetPassword} className="p-6 space-y-4">
+              <form onSubmit={handleResetPassword} className="p-6 space-y-4" autoComplete="off">
                 <div>
                   <p className="text-xs text-slate-500">Admin Email</p>
                   <p className="text-sm font-bold text-slate-900 dark:text-white font-mono mt-0.5">{resetModalAdmin.email}</p>
@@ -1723,7 +1759,7 @@ export default function SuperAdminDashboard() {
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="field-label mb-0">New Password <span className="text-rose-500">*</span></label>
+                    <label htmlFor="reset-admin-password" className="field-label mb-0">New Password <span className="text-rose-500">*</span></label>
                     <button
                       type="button"
                       onClick={() => {
@@ -1739,11 +1775,14 @@ export default function SuperAdminDashboard() {
 
                   <div className="relative">
                     <input
+                      id="reset-admin-password"
+                      name="resetPassword"
                       type={showResetPassword ? 'text' : 'password'}
                       value={resetPassword}
                       onChange={e => setResetPassword(e.target.value)}
                       placeholder="Enter new password (min. 6 characters)..."
                       className="field-input pr-10 font-mono text-xs"
+                      autoComplete="new-password"
                       required
                       autoFocus
                     />
@@ -1774,7 +1813,7 @@ export default function SuperAdminDashboard() {
 
         {/* ── Modal: Confirm Delete Admin ── */}
         {deleteModalAdmin && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeleteModalAdmin(null); }}>
+          <div className="modal-overlay">
             <div className="modal-panel max-w-[420px]">
               <div className="p-6 space-y-4">
                 <div className="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400">
