@@ -59,10 +59,6 @@ export function getQuizGuardStatus(overrideDate?: Date): QuizGuardResult {
   let currentHour = parseInt(partsMap.hour, 10);
   if (currentHour === 24) currentHour = 0;
   const currentMinute = parseInt(partsMap.minute, 10);
-  const currentTotalMinutes = currentHour * 60 + currentMinute;
-
-  const weekdayStr = partsMap.weekday; // 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'
-  const isWeekend = weekdayStr === 'Sat' || weekdayStr === 'Sun';
 
   let currentTimeString = '';
   try {
@@ -77,11 +73,11 @@ export function getQuizGuardStatus(overrideDate?: Date): QuizGuardResult {
     currentTimeString = `${currentHour}:${String(currentMinute).padStart(2, '0')}`;
   }
 
-  // Quiz is ACTIVE ALL TIME for now
+  // Quiz is ALWAYS AVAILABLE 24/7 (strictly 1 attempt per day resets at midnight)
   return {
     isOpen: true,
     state: 'OPEN',
-    message: "Today's quiz is LIVE! Good luck!",
+    message: "Today's quiz is available! Good luck!",
     quizDate,
     currentTimeString,
   };

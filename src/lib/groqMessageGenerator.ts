@@ -32,10 +32,10 @@ const FALLBACK_MESSAGES: Record<QuizStatusState, string[]> = {
     "Patching weekend operational! Re-arm your cyber mind and join us Monday at 10:00 AM IST."
   ],
   ALREADY_ATTEMPTED: [
-    "Attempt logged! Your score is locked in for today. Return tomorrow at 10:00 AM IST for a new question!",
-    "Daily quota filled! Outstanding effort today. Check back tomorrow at 10:00 AM IST for your next challenge.",
-    "Your response has been secured in the vault. Check the leaderboard and prepare for tomorrow's 10 AM IST quiz!",
-    "Mission accomplished for today! Return tomorrow at 10:00 AM IST to maintain your streak."
+    "Attempt logged! Your score is locked in for today. Return tomorrow for a new question!",
+    "Daily quota filled! Outstanding effort today. Check back tomorrow for your next challenge.",
+    "Your response has been secured in the vault. Check the leaderboard and prepare for tomorrow's quiz!",
+    "Mission accomplished for today! Return tomorrow to maintain your streak."
   ],
   REGISTRATION_KEY_REQUIRED: [
     "A valid department registration key is required to proceed. Please enter your college key in your profile.",
@@ -53,8 +53,8 @@ const FALLBACK_MESSAGES: Record<QuizStatusState, string[]> = {
     "Action required: finalize your college department registration key and password to unlock today's challenge."
   ],
   OPEN: [
-    "Today's quiz is LIVE! Good luck defender!",
-    "System operational! Answer quickly before 11:00 AM IST for Early Bird bonus points!"
+    "Today's quiz is ready! Good luck defender!",
+    "System operational! Answer quickly for maximum speed bonus points!"
   ]
 };
 
@@ -66,7 +66,7 @@ function getRandomFallbackMessage(state: QuizStatusState, defaultMsg: string): s
 }
 
 export async function getDynamicGuardMessage(state: QuizStatusState, defaultMsg: string): Promise<string> {
-  // If state is OPEN, return standard live message
+  // If state is OPEN, return standard message
   if (state === 'OPEN') return defaultMsg;
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -76,13 +76,13 @@ export async function getDynamicGuardMessage(state: QuizStatusState, defaultMsg:
 
   let promptContext = '';
   if (state === 'BEFORE_WINDOW') {
-    promptContext = "The daily cybersecurity quiz is currently closed because it opens at 10:00 AM IST (Monday-Friday). Write a punchy, creative 1-sentence message (under 25 words) telling the user to return at 10:00 AM IST. Vary tone with cybersecurity themes like firewalls, encrypted vaults, zero-day readiness, or defense skills.";
+    promptContext = "The daily cybersecurity quiz is currently closed. Write a punchy, creative 1-sentence message (under 25 words) telling the user to return later. Vary tone with cybersecurity themes like firewalls, encrypted vaults, zero-day readiness, or defense skills.";
   } else if (state === 'AFTER_WINDOW') {
-    promptContext = "Today's daily cybersecurity quiz window (10:00 AM - 9:00 PM IST) has closed for the day. Write a clever, punchy 1-sentence message (under 25 words) encouraging them and telling them to return tomorrow at 10:00 AM IST for the next challenge.";
+    promptContext = "Today's daily cybersecurity quiz has closed. Write a clever, punchy 1-sentence message (under 25 words) encouraging them and telling them to return tomorrow for the next challenge.";
   } else if (state === 'WEEKEND') {
-    promptContext = "The daily cybersecurity quiz is unavailable because it is the weekend (Saturday/Sunday). Write a fun, witty 1-sentence weekend blackout message (under 25 words) reminding users to rest up their cyber defenses and return on Monday at 10:00 AM IST.";
+    promptContext = "The daily cybersecurity quiz is unavailable. Write a fun, witty 1-sentence message (under 25 words) reminding users to rest up their cyber defenses and return tomorrow.";
   } else if (state === 'ALREADY_ATTEMPTED') {
-    promptContext = "The user has already completed today's single daily cybersecurity quiz attempt. Write an encouraging 1-sentence message (under 25 words) praising their attempt and reminding them to check back tomorrow at 10:00 AM IST.";
+    promptContext = "The user has already completed today's single daily cybersecurity quiz attempt. Write an encouraging 1-sentence message (under 25 words) praising their attempt and reminding them to check back tomorrow.";
   } else {
     return defaultMsg;
   }

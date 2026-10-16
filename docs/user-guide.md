@@ -31,8 +31,8 @@ Welcome to the **CybersecQuizzer** User & Administrator Guide. This guide covers
 
 **CybersecQuizzer** is an institutional daily micro-learning platform designed to build persistent cybersecurity hygiene among college students.
 
-- **One Challenge Daily**: Students receive strictly one timed challenge per day (Monday to Friday, 10:00 AM – 9:00 PM IST).
-- **Speed & Early Bird Bonuses**: Maximize points by answering early in the morning and responding swiftly.
+- **One Challenge Daily**: Students receive strictly one timed challenge per day, available 24/7 (resets daily at midnight).
+- **Speed Bonuses**: Maximize points by answering accurately and responding swiftly.
 - **Institutional Hierarchy**: Students are linked to specific Colleges and Academic Departments through **Registration Keys**, enabling granular performance analytics, department comparisons, and risk identification.
 
 ---
@@ -58,7 +58,7 @@ Welcome to the **CybersecQuizzer** User & Administrator Guide. This guide covers
 ## 3. Student Guide
 
 ### Daily Quiz Participation
-1. Visit the home screen during active hours (**10:00 AM – 9:00 PM IST**, Monday–Friday).
+1. Visit the home screen anytime — the quiz is available **24/7**.
 2. Enter your unique **Nickname** or log in with your credentials.
 3. Answer the daily multiple-choice challenge before the 30-second countdown expires.
 4. Review your instant score, response time, and detailed cybersecurity explanation.

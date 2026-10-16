@@ -46,26 +46,8 @@ export function calculateScore(
     bonusPoints = 0.0;
   }
 
-  // Early Bird Bonus (+1.00 pt if completed before 11:00 AM in target timezone)
-  let earlyBirdBonus = 0;
-  if (submissionTime) {
-    try {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone,
-        hour: 'numeric',
-        hour12: false,
-      });
-      const hour = parseInt(formatter.format(submissionTime), 10);
-      if (hour < 11) {
-        earlyBirdBonus = 1.0;
-      }
-    } catch (e) {
-      // Default fallback check
-      if (submissionTime.getHours() < 11) {
-        earlyBirdBonus = 1.0;
-      }
-    }
-  }
+  // Early Bird Bonus disabled — quiz is available 24/7 with equal scoring
+  const earlyBirdBonus = 0;
 
   const totalPoints = Number((baseScore + bonusPoints + earlyBirdBonus).toFixed(2));
 
