@@ -24,6 +24,10 @@ jobs:
           URL="${URL%/}"
           
           if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+              echo "⚠️ Skipping scheduled Supabase ping: SUPABASE_URL or SUPABASE_ANON_KEY is missing."
+              exit 0
+            fi
             echo "❌ Error: SUPABASE_URL or SUPABASE_ANON_KEY secret is empty or missing in GitHub Repository Secrets."
             echo "Please check Settings > Secrets and variables > Actions > Repository secrets."
             exit 1
