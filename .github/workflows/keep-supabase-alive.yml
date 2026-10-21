@@ -1,61 +1,116 @@
-name: Keep Supabase Project Alive
+name: Keep Database Awake
 
 on:
   schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch: 
+    # Runs every 12 hours (at 00:00 and 12:00 UTC) to prevent Supabase from auto-pausing
+    - cron: '0 0,12 * * *'
+  workflow_dispatch:
 
 jobs:
-  ping-supabase:
+  keep-alive:
+    name: Ping Database & App
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase REST API
+      - name: Ping Supabase Database & Web App
         run: |
-          echo "Pinging Supabase database to prevent auto-pause..."
-          
-          RAW_URL="${{ secrets.SUPABASE_URL }}"
-          RAW_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
-          
-          # Clean spaces and quotes
-          URL=$(echo "$RAW_URL" | xargs | tr -d '"' | tr -d "'")
-          KEY=$(echo "$RAW_KEY" | xargs | tr -d '"' | tr -d "'")
-          
-          # Remove trailing slash if present
-          URL="${URL%/}"
-          
-          if [ -z "$URL" ] || [ -z "$KEY" ]; then
-            echo "❌ Error: SUPABASE_URL or SUPABASE_ANON_KEY secret is empty or missing in GitHub Repository Secrets."
-            echo "Please check Settings > Secrets and variables > Actions > Repository secrets."
-            exit 1
+          echo "=========================================================="
+          echo " Starting Database Keep-Alive Routine"
+          echo "=========================================================="
+
+          # Resolve Supabase URL with fallback cascade
+          URL="${{ secrets.SUPABASE_URL }}"
+          if [ -z "$URL" ]; then
+            URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
+          fi
+          if [ -z "$URL" ]; then
+            URL="https://xxhnkkpmizowrgireaui.supabase.co"
           fi
 
-          # Query questions table (runs an actual SELECT query on the Postgres database)
-          TARGET_ENDPOINT="${URL}/rest/v1/questions?select=id&limit=1"
-          echo "Targeting Endpoint: $TARGET_ENDPOINT"
+          # Resolve Supabase Key with fallback cascade
+          KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          if [ -z "$KEY" ]; then
+            KEY="${{ secrets.SUPABASE_KEY }}"
+          fi
+          if [ -z "$KEY" ]; then
+            KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}"
+          fi
+          if [ -z "$KEY" ]; then
+            KEY="sb_publishable_uOEVESKjGVyLa5fo1ZPDxw_khj-FxdT"
+          fi
 
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          # Clean quotes, spaces, trailing slash
+          URL=$(echo "$URL" | xargs | tr -d '"' | tr -d "'")
+          URL="${URL%/}"
+          KEY=$(echo "$KEY" | xargs | tr -d '"' | tr -d "'")
+
+          echo "Target Supabase Host: ${URL}"
+
+          # 1. Ping questions table (triggers active query against PostgreSQL)
+          echo "--> Pinging /rest/v1/questions table..."
+          STATUS_Q=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "apikey: $KEY" \
             -H "Authorization: Bearer $KEY" \
-            "$TARGET_ENDPOINT")
-            
-          echo "Supabase HTTP Status Code: $HTTP_STATUS"
-          
-          # If 404 (questions table not created yet), fallback to root OpenAPI schema request
-          if [ "$HTTP_STATUS" -eq 404 ]; then
-            echo "Table 'questions' not found, falling back to root REST API ping..."
-            TARGET_ENDPOINT="${URL}/rest/v1/"
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${URL}/rest/v1/questions?select=id&limit=1")
+          echo "    Questions Table HTTP Status: $STATUS_Q"
+
+          # 2. Ping user_attempts table
+          echo "--> Pinging /rest/v1/user_attempts table..."
+          STATUS_A=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            "${URL}/rest/v1/user_attempts?select=id&limit=1")
+          echo "    User Attempts Table HTTP Status: $STATUS_A"
+
+          # 3. Ping colleges table
+          echo "--> Pinging /rest/v1/colleges table..."
+          STATUS_C=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            "${URL}/rest/v1/colleges?select=id&limit=1")
+          echo "    Colleges Table HTTP Status: $STATUS_C"
+
+          # 4. Fallback root REST API ping if tables returned 404
+          if [ "$STATUS_Q" -eq 404 ] && [ "$STATUS_A" -eq 404 ]; then
+            echo "--> Falling back to Supabase OpenAPI Schema ping..."
+            STATUS_ROOT=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "apikey: $KEY" \
               -H "Authorization: Bearer $KEY" \
               -H "Accept: application/json" \
-              "$TARGET_ENDPOINT")
-            echo "Fallback HTTP Status Code: $HTTP_STATUS"
+              "${URL}/rest/v1/")
+            echo "    Root REST API HTTP Status: $STATUS_ROOT"
           fi
-          
-          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
-            echo "✅ Successfully pinged Supabase! Database keep-alive active."
+
+          # 5. Ping production application API to warm serverless & database connections
+          APP_URL="${{ secrets.APP_URL }}"
+          if [ -z "$APP_URL" ]; then
+            APP_URL="https://cybersecurity-quiz-app-2.vercel.app"
+          fi
+          APP_URL="${APP_URL%/}"
+
+          echo "--> Pinging production app API at ${APP_URL}/api/leaderboard..."
+          STATUS_APP=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 15 \
+            "${APP_URL}/api/leaderboard" || echo "000")
+          echo "    App Leaderboard API HTTP Status: $STATUS_APP"
+
+          echo "=========================================================="
+          echo " Evaluation Summary:"
+          echo " - Questions Query:    $STATUS_Q"
+          echo " - Attempts Query:     $STATUS_A"
+          echo " - Colleges Query:     $STATUS_C"
+          echo " - App API Ping:       $STATUS_APP"
+          echo "=========================================================="
+
+          # Check if at least one Supabase query succeeded
+          if [ "$STATUS_Q" -ge 200 ] && [ "$STATUS_Q" -lt 400 ] || \
+             [ "$STATUS_A" -ge 200 ] && [ "$STATUS_A" -lt 400 ] || \
+             [ "$STATUS_C" -ge 200 ] && [ "$STATUS_C" -lt 400 ]; then
+            echo " Database is ACTIVE and awake! Keep-alive succeeded."
+            exit 0
+          elif [ "$STATUS_APP" -ge 200 ] && [ "$STATUS_APP" -lt 400 ]; then
+            echo " Production App API responded ($STATUS_APP) and triggered database query. Keep-alive succeeded."
+            exit 0
           else
-            echo "❌ Failed to ping Supabase. HTTP status: $HTTP_STATUS"
-            echo "Note: If status is 401, check if SUPABASE_ANON_KEY in GitHub Secrets is correct."
+            echo " Warning: Database ping responses did not return 2xx/3xx. Please verify credentials."
             exit 1
           fi
