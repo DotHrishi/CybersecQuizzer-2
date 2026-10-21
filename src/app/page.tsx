@@ -160,7 +160,7 @@ export default function HomePage() {
     );
   }
 
-  // 4. Non-open timing guard (Before 11 AM, After 2 PM, Weekend, or Already Attempted)
+  // 4. Guard state (Already Attempted today or Profile Completion Required)
   if (guardState && guardState !== 'OPEN') {
     return (
       <div className="space-y-4">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dataService } from '@/lib/dataService';
-import { getDynamicQuizGuardStatus } from '@/lib/quizGuard';
+import { getTodayQuizDate } from '@/lib/quizGuard';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { activeSessions } from '@/lib/sessionStore';
 import { shuffleOptions } from '@/lib/antiCheat';
@@ -22,14 +22,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const guard = await getDynamicQuizGuardStatus();
-
-  if (!guard.isOpen) {
-    return NextResponse.json(
-      { success: false, state: guard.state, message: guard.message },
-      { status: 403 }
-    );
-  }
+  // Quiz is always available 24/7 — no availability window check needed
+  const quizDate = getTodayQuizDate();
 
   // Backend enforcement: Check 5-day grace period for valid registration key & password
   const cleanUser = userName.trim();
@@ -82,7 +76,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Double-check if user already attempted today — Strictly ONE QUESTION PER DAY
-  const existingAttempt = await dataService.getUserAttemptToday(userName.trim(), guard.quizDate);
+  const existingAttempt = await dataService.getUserAttemptToday(userName.trim(), quizDate);
 
   if (existingAttempt) {
     return NextResponse.json(
@@ -128,7 +122,7 @@ export async function GET(req: NextRequest) {
       questionId: targetQuestion.id,
       startTime,
       userName: userName.trim(),
-      quizDate: guard.quizDate,
+      quizDate,
       expectedOptionKey: correctOptionKey,
     });
 
@@ -142,7 +136,7 @@ export async function GET(req: NextRequest) {
       sessionId,
       questionId: targetQuestion.id,
       userName: userName.trim(),
-      quizDate: guard.quizDate,
+      quizDate,
       expectedOptionKey: correctOptionKey,
       startTime,
       exp,

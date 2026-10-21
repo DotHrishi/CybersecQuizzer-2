@@ -75,13 +75,7 @@ export async function getDynamicGuardMessage(state: QuizStatusState, defaultMsg:
   }
 
   let promptContext = '';
-  if (state === 'BEFORE_WINDOW') {
-    promptContext = "The daily cybersecurity quiz is currently closed. Write a punchy, creative 1-sentence message (under 25 words) telling the user to return later. Vary tone with cybersecurity themes like firewalls, encrypted vaults, zero-day readiness, or defense skills.";
-  } else if (state === 'AFTER_WINDOW') {
-    promptContext = "Today's daily cybersecurity quiz has closed. Write a clever, punchy 1-sentence message (under 25 words) encouraging them and telling them to return tomorrow for the next challenge.";
-  } else if (state === 'WEEKEND') {
-    promptContext = "The daily cybersecurity quiz is unavailable. Write a fun, witty 1-sentence message (under 25 words) reminding users to rest up their cyber defenses and return tomorrow.";
-  } else if (state === 'ALREADY_ATTEMPTED') {
+  if (state === 'ALREADY_ATTEMPTED') {
     promptContext = "The user has already completed today's single daily cybersecurity quiz attempt. Write an encouraging 1-sentence message (under 25 words) praising their attempt and reminding them to check back tomorrow.";
   } else {
     return defaultMsg;

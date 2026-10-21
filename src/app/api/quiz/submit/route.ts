@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dataService } from '@/lib/dataService';
 import { calculateScore } from '@/lib/scoring';
-import { getQuizGuardStatus } from '@/lib/quizGuard';
 import { QuizSubmissionSchema } from '@/lib/validation';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { activeSessions } from '@/lib/sessionStore';
@@ -53,14 +52,6 @@ export async function POST(req: NextRequest) {
     if (session.userName.toLowerCase() !== userName.toLowerCase()) {
       return NextResponse.json(
         { success: false, message: 'Session identity mismatch.' },
-        { status: 403 }
-      );
-    }
-
-    const guard = getQuizGuardStatus();
-    if (!guard.isOpen) {
-      return NextResponse.json(
-        { success: false, state: guard.state, message: guard.message },
         { status: 403 }
       );
     }

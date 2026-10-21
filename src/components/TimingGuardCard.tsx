@@ -393,13 +393,6 @@ export default function TimingGuardCard({ state, message, userName, attempt }: T
         </div>
       )}
 
-      {/* ── Schedule note ── */}
-      {!isAttempted && (
-        <p className="text-xs text-slate-400 dark:text-slate-500 text-center max-w-sm mx-auto">
-          {state === 'BEFORE_WINDOW' && 'Quiz runs Mon–Fri between 10:00 AM – 9:00 PM IST. Complete before 11 AM for Early Bird bonus points.'}
-          {state === 'AFTER_WINDOW' && "Today's session has ended. Return tomorrow at 10:00 AM IST for the next challenge."}
-        </p>
-      )}
 
       {/* ── Action buttons ── */}
       <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2.5 justify-center">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dataService } from '@/lib/dataService';
-import { getDynamicQuizGuardStatus } from '@/lib/quizGuard';
+import { getTodayQuizDate } from '@/lib/quizGuard';
 import { getDynamicGuardMessage } from '@/lib/groqMessageGenerator';
 import { UserNameSchema } from '@/lib/validation';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
@@ -23,10 +23,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { userName } = validation.data;
-    const guard = await getDynamicQuizGuardStatus();
+    const quizDate = getTodayQuizDate();
 
     // Check if user already attempted today — Strictly ONE QUESTION PER DAY
-    const existingAttempt = await dataService.getUserAttemptToday(userName, guard.quizDate);
+    const existingAttempt = await dataService.getUserAttemptToday(userName, quizDate);
 
     if (existingAttempt) {
       const alreadyAttemptedMsg = await getDynamicGuardMessage('ALREADY_ATTEMPTED', "You have already attempted today's quiz. Come back tomorrow!");
@@ -97,9 +97,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       userName,
-      guardState: guard.state,
-      isOpen: guard.isOpen,
-      message: guard.message,
+      guardState: 'OPEN',
+      isOpen: true,
+      message: "Today's quiz is available! Good luck!",
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: 'SERVER_ERROR', message: error.message }, { status: 500 });

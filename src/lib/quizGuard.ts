@@ -1,5 +1,4 @@
 import { QuizStatusState } from '../types/quiz';
-import { getDynamicGuardMessage } from './groqMessageGenerator';
 
 export interface QuizGuardResult {
   isOpen: boolean;
@@ -9,90 +8,40 @@ export interface QuizGuardResult {
   currentTimeString: string;
 }
 
-
-export function getQuizGuardStatus(overrideDate?: Date): QuizGuardResult {
+/**
+ * Returns today's quiz date formatted YYYY-MM-DD in Asia/Kolkata (IST).
+ */
+export function getTodayQuizDate(overrideDate?: Date): string {
   const now = overrideDate || new Date();
-
-  // Target timezone: Strictly Indian Standard Time (Asia/Kolkata)
-  const timeZone = 'Asia/Kolkata';
-
-  // Extract year, month, day, hour, minute, and weekday in target local timezone
-  let partsMap: Record<string, string> = {};
   try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: false,
-      weekday: 'short',
-    });
-
-    formatter.formatToParts(now).forEach(({ type, value }) => {
-      partsMap[type] = value;
-    });
-  } catch (err) {
-    // Fallback to UTC if invalid timezone passed
-    const formatter = new Intl.DateTimeFormat('en-US', {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: false,
-      weekday: 'short',
     });
-
-    formatter.formatToParts(now).forEach(({ type, value }) => {
-      partsMap[type] = value;
-    });
+    return formatter.format(now);
+  } catch {
+    const d = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
+}
 
-  const year = partsMap.year;
-  const month = partsMap.month;
-  const day = partsMap.day;
-  const quizDate = `${year}-${month}-${day}`;
-
-  let currentHour = parseInt(partsMap.hour, 10);
-  if (currentHour === 24) currentHour = 0;
-  const currentMinute = parseInt(partsMap.minute, 10);
-
-  let currentTimeString = '';
-  try {
-    const displayTimeFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-    currentTimeString = displayTimeFormatter.format(now);
-  } catch (e) {
-    currentTimeString = `${currentHour}:${String(currentMinute).padStart(2, '0')}`;
-  }
-
-  // Quiz is ALWAYS AVAILABLE 24/7 (strictly 1 attempt per day resets at midnight)
+/**
+ * Quiz is always available 24/7 without availability window restrictions.
+ */
+export function getQuizGuardStatus(overrideDate?: Date): QuizGuardResult {
+  const quizDate = getTodayQuizDate(overrideDate);
   return {
     isOpen: true,
     state: 'OPEN',
     message: "Today's quiz is available! Good luck!",
     quizDate,
-    currentTimeString,
+    currentTimeString: '',
   };
 }
 
-
 export async function getDynamicQuizGuardStatus(overrideDate?: Date): Promise<QuizGuardResult> {
-  const guard = getQuizGuardStatus(overrideDate);
-  if (!guard.isOpen) {
-    const dynamicMessage = await getDynamicGuardMessage(guard.state, guard.message);
-    return {
-      ...guard,
-      message: dynamicMessage,
-    };
-  }
-  return guard;
+  return getQuizGuardStatus(overrideDate);
 }
 
