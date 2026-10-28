@@ -121,9 +121,8 @@ export default function HomePage() {
   // 0. Server-side / Hydration loading placeholder
   if (!isMounted) {
     return (
-      <div className="py-24 text-center text-slate-400 space-y-4">
+      <div className="py-24 text-center text-slate-400">
         <RefreshCw className="w-10 h-10 mx-auto animate-spin text-slate-400" />
-        <p className="text-base font-semibold">Loading session...</p>
       </div>
     );
   }
@@ -138,9 +137,8 @@ export default function HomePage() {
   // 2. Loading state
   if (isLoading) {
     return (
-      <div className="py-24 text-center text-slate-400 space-y-4">
+      <div className="py-24 text-center text-slate-400">
         <RefreshCw className="w-10 h-10 mx-auto animate-spin text-cyber-accent" />
-        <p className="text-base font-semibold">Verifying quiz session...</p>
       </div>
     );
   }
